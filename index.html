@@ -196,7 +196,14 @@
 
         // --- FIREBASE CONFIGURATION & INITIALIZATION ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const firebaseConfig = {
+  apiKey: "AIzaSyAdH1rjWMEWl31i8A4n8gOGbeejNB7N8i8",
+  authDomain: "studio-5346519290-a8029.firebaseapp.com",
+  projectId: "studio-5346519290-a8029",
+  storageBucket: "studio-5346519290-a8029.firebasestorage.app",
+  messagingSenderId: "1034136480503",
+  appId: "1:1034136480503:web:12a3094cb5195c734bc1f2"
+};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         let app, db, auth;
