@@ -1,16 +1,13 @@
 {
   "name": "Rumy Friends",
   "short_name": "RumyFriends",
-  "start_url": "index.html", // تبدیل
-  "scope": "/",              // تبدیل
+  "description": "Rumy Friends: Your Progressive Web App for score keeping and tracking.",
+  "start_url": "/Rumyfriends/index.html",
+  "scope": "/Rumyfriends/",
   "display": "standalone",
   "background_color": "#2196F3",
   "theme_color": "#2196F3",
   "icons": [
-    // آئیکنز کے URL میں بھی ریپوزٹری کا نام شامل کرنے کی ضرورت پڑ سکتی ہے، 
-    // مثلاً: "/Rumyfriends/icon-192.png" اگر وہ روٹ پر نہ ہوں۔
-    // لیکن اگر یہ icon-192.png، manifest.json کے ساتھ ایک ہی ڈائریکٹری میں ہیں،
-    // تو موجودہ کوڈ ٹھیک ہے۔
     {
       "src": "icon-192.png",
       "sizes": "192x192",
