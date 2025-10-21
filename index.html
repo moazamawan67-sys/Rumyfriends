@@ -118,11 +118,11 @@
                  <div id="game-over-message" class="hidden p-4 mb-4 text-center bg-red-100 border-r-4 border-red-500 text-red-700 rounded-lg">
                     <p class="urdu-font-bold text-xl mb-3"></p>
                     <div class="flex flex-col sm:flex-row justify-center gap-3">
-                         <button id="record-game-btn" class="hidden px-4 py-2 bg-purple-600 text-white urdu-font-normal rounded-lg hover:bg-purple-700 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                         <button id="record-game-btn" disabled class="hidden px-4 py-2 bg-purple-600 text-white urdu-font-normal rounded-lg hover:bg-purple-700 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                             <span id="record-text">گیم ریکارڈ کریں</span>
                             <div id="record-spinner" class="loader hidden w-4 h-4"></div>
                         </button>
-                        <button id="reset-game-btn" class="hidden px-4 py-2 bg-cyan-600 text-white urdu-font-normal rounded-lg hover:bg-cyan-700 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                        <button id="reset-game-btn" disabled class="hidden px-4 py-2 bg-cyan-600 text-white urdu-font-normal rounded-lg hover:bg-cyan-700 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                              نیا گیم شروع کریں 
                         </button>
                     </div>
@@ -216,18 +216,20 @@
         </div>
     </div>
     
-    <script>
-        // Firebase Configuration - یہاں اپنی Firebase keys ڈالیں
-        const firebaseConfig = {
-            // اپنا Firebase config یہاں ڈالیں
-            // یہ Firebase console سے ملے گا
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, signInAnonymously, signInWithCustomToken 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, doc, setDoc, onSnapshot, collection, query, getDocs, addDoc, deleteDoc, runTransaction, setLogLevel 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase variables are provided by the Canvas environment
+        let db, auth;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        let userId = 'loading'; // Will be updated after auth
 
         // Default State
         const DEFAULT_GAME_STATE = {
@@ -245,7 +247,11 @@
         };
 
         let gameState = {...DEFAULT_GAME_STATE};
-        let userId = 'local-user-' + Math.random().toString(36).substr(2, 9);
+
+        // Firestore Paths (using the required artifact structure)
+        const getCurrentGameRef = () => doc(db, 'artifacts', appId, 'users', userId, 'game_state', 'current_game');
+        const getRecordsCollectionRef = () => collection(db, 'artifacts', appId, 'users', userId, 'recorded_games');
+
 
         // UI Elements
         const ui = {
@@ -292,7 +298,8 @@
 
         const getRoundType = (roundNumber) => {
             const cyclePosition = (roundNumber - 1) % 5;
-            return cyclePosition < 2 ? 'lucky' : 'normal';
+            // Rounds 1 and 2 are lucky (double score), 3, 4, 5 are normal.
+            return cyclePosition < 2 ? 'lucky' : 'normal'; 
         };
 
         const getRoundTypeDisplay = (roundType) => {
@@ -304,8 +311,11 @@
         };
 
         const setStatus = (message, isError = false) => {
+            const existingStatus = document.querySelector('.status-message');
+            if (existingStatus) existingStatus.remove();
+            
             const statusBox = document.createElement('div');
-            statusBox.className = `p-3 mb-4 text-center rounded-lg urdu-font-normal ${isError ? 'bg-red-100 text-red-700' : 'bg-cyan-100 text-cyan-700'}`;
+            statusBox.className = `status-message p-3 mb-4 text-center rounded-lg urdu-font-normal ${isError ? 'bg-red-100 text-red-700' : 'bg-cyan-100 text-cyan-700'}`;
             statusBox.textContent = message;
             document.querySelector('main').prepend(statusBox);
             setTimeout(() => statusBox.remove(), 5000);
@@ -318,8 +328,12 @@
             ui.recordGameBtn.addEventListener('click', handleRecordGame);
             ui.refreshRecordsBtn.addEventListener('click', () => fetchAndRenderRecords(true));
             ui.settingsBtn.addEventListener('click', () => {
-                ui.settingsModal.classList.remove('hidden');
-                renderSettingsModal();
+                if (auth && auth.currentUser) {
+                    ui.settingsModal.classList.remove('hidden');
+                    renderSettingsModal();
+                } else {
+                     setStatus('ڈیٹا لوڈ ہونے کا انتظار ہے...', true);
+                }
             });
             ui.cancelSettingsBtn.addEventListener('click', () => {
                 ui.settingsModal.classList.add('hidden');
@@ -335,21 +349,70 @@
             });
         };
 
-        // Game Logic
+        // --- FIREBASE DATA MANAGEMENT ---
+
+        const saveGameState = async (newGameState = gameState) => {
+            if (!db || !auth.currentUser) return; // Check if Firebase is ready
+            try {
+                const gameRef = getCurrentGameRef();
+                await setDoc(gameRef, newGameState);
+                // Snapshot listener will handle the UI update
+            } catch (error) {
+                console.error('Error saving game state to Firestore:', error);
+                setStatus('ڈیٹا کلاؤڈ میں محفوظ کرنے میں ناکامی', true);
+            }
+        };
+
+        const setupGameStateListener = async () => {
+             const gameRef = getCurrentGameRef();
+             onSnapshot(gameRef, (docSnapshot) => {
+                if (docSnapshot.exists()) {
+                    const loadedState = docSnapshot.data();
+                    gameState = { ...DEFAULT_GAME_STATE, ...loadedState };
+                } else {
+                    // Document doesn't exist, initialize it with default state
+                    console.log("No current game found, initializing on Firestore.");
+                    setDoc(gameRef, DEFAULT_GAME_STATE);
+                }
+                
+                // Always render the UI after the snapshot or initialization
+                renderGameUI();
+                
+                // Hide loading overlay once initial data is ready
+                setTimeout(() => {
+                    ui.loadingOverlay.classList.add('opacity-0');
+                    setTimeout(() => ui.loadingOverlay.classList.add('hidden'), 500);
+                }, 500);
+
+            }, (error) => {
+                console.error("Snapshot error:", error);
+                ui.authStatus.textContent = 'ڈیٹا لوڈ کرنے میں خرابی (Snap Error)';
+            });
+        };
+
+
+        // --- GAME LOGIC ---
+
         const validateScoreInputs = () => {
             const inputs = document.querySelectorAll('.score-input');
             let zeroCount = 0;
             let hasNegative = false;
+            let positiveCount = 0;
             let allEmpty = true;
             
             inputs.forEach(input => {
-                const value = parseInt(input.value) || 0;
-                if (value === 0) zeroCount++;
-                if (value < 0) hasNegative = true;
+                const value = parseInt(input.value);
                 if (input.value !== '') allEmpty = false;
+                if (!isNaN(value)) {
+                    if (value === 0) zeroCount++;
+                    if (value > 0) positiveCount++;
+                    if (value < 0) hasNegative = true;
+                }
             });
             
-            const isValid = !allEmpty && !hasNegative && zeroCount === 1;
+            // Valid if: not all empty, no negatives, exactly one zero, and at least one positive score.
+            const isValid = !allEmpty && !hasNegative && zeroCount === 1 && positiveCount >= 1;
+
             ui.saveScoreBtn.disabled = !isValid;
             
             if (!allEmpty && (!isValid || hasNegative)) {
@@ -363,51 +426,85 @@
         };
 
         const handleSaveScore = async () => {
-            if (isSaving) return;
-            
-            const inputs = document.querySelectorAll('.score-input');
-            const roundScores = [];
-            
-            gameState.players.forEach((player, index) => {
-                const input = inputs[index];
-                const score = parseInt(input.value) || 0;
-                roundScores.push(score);
-                input.value = '';
-            });
+            if (isSaving || gameState.isGameOver) return;
             
             if (!validateScoreInputs()) {
                 setStatus('براہ کرم درست سکور درج کریں۔', true);
                 return;
             }
-            
+
+            // Start saving state and UI updates
             isSaving = true;
             ui.saveScoreBtn.disabled = true;
             ui.saveText.textContent = 'محفوظ ہو رہا ہے...';
             ui.saveSpinner.classList.remove('hidden');
             
             try {
-                const nextRoundNumber = gameState.history.length + 1;
-                const roundType = getRoundType(nextRoundNumber);
-                const multiplier = getRoundMultiplier(roundType);
-                
-                const round = {
-                    timestamp: new Date(),
-                    scores: roundScores,
-                    roundType: roundType,
-                    multiplier: multiplier,
-                    actualScores: roundScores.map(score => score * multiplier)
-                };
-                
-                roundScores.forEach((score, index) => {
-                    gameState.players[index].score += score * multiplier;
+                // Use a transaction to ensure atomic update of scores and history
+                await runTransaction(db, async (transaction) => {
+                    const gameRef = getCurrentGameRef();
+                    const doc = await transaction.get(gameRef);
+
+                    if (!doc.exists()) {
+                         throw "Document does not exist!";
+                    }
+                    
+                    const currentData = doc.data();
+                    // Deep clone history to modify it
+                    let newHistory = Array.isArray(currentData.history) ? [...currentData.history] : [];
+                    let newPlayers = currentData.players.map(p => ({...p}));
+                    
+                    const nextRoundNumber = newHistory.length + 1;
+                    const roundType = getRoundType(nextRoundNumber);
+                    const multiplier = getRoundMultiplier(roundType);
+                    
+                    const inputs = document.querySelectorAll('.score-input');
+                    const roundScores = [];
+
+                    inputs.forEach((input, index) => {
+                        const baseScore = parseInt(input.value) || 0;
+                        const actualScore = baseScore * multiplier;
+                        roundScores.push(baseScore);
+                        newPlayers[index].score += actualScore;
+                    });
+
+                    const round = {
+                        timestamp: new Date().toISOString(), // Use ISO string for safe storage
+                        scores: roundScores, // Base scores
+                        roundType: roundType,
+                        multiplier: multiplier,
+                        actualScores: roundScores.map(score => score * multiplier)
+                    };
+                    
+                    newHistory.unshift(round);
+
+                    // Check for Game Over in the new state
+                    let isGameOver = currentData.isGameOver;
+                    const losers = newPlayers.filter(player => player.score >= currentData.gameLimit);
+                    if (losers.length > 0) {
+                        isGameOver = true;
+                        const actualLoser = losers.reduce((max, player) => 
+                            player.score > max.score ? player : max, losers[0]
+                        );
+                        // Mark the loser in the latest round (which is at index 0)
+                        const loserIndex = newPlayers.findIndex(p => p.id === actualLoser.id);
+                        newHistory[0].loserIndex = loserIndex;
+                    }
+                    
+                    // Update document in transaction
+                    transaction.set(gameRef, {
+                        ...currentData,
+                        players: newPlayers,
+                        history: newHistory,
+                        isGameOver: isGameOver,
+                        isRecorded: isGameOver ? currentData.isRecorded : false, // Reset recorded status if game is ongoing
+                    });
                 });
                 
-                gameState.history.unshift(round);
-                checkGameOver();
-                saveGameState();
-                
-                renderGameUI();
-                setStatus(`راؤنڈ کا سکور کامیابی سے محفوظ ہو گیا! (${getRoundTypeDisplay(roundType)})`);
+                // Clear inputs after successful transaction
+                document.querySelectorAll('.score-input').forEach(input => input.value = '');
+
+                setStatus(`راؤنڈ کا سکور کامیابی سے محفوظ ہو گیا! (${getRoundTypeDisplay(getRoundType(gameState.history.length + 1))})`);
                 
             } catch (error) {
                 console.error('Error saving score:', error);
@@ -420,70 +517,128 @@
             }
         };
 
-        const checkGameOver = () => {
-            const losers = gameState.players.filter(player => 
-                player.score >= gameState.gameLimit
-            );
-            
-            if (losers.length > 0) {
-                gameState.isGameOver = true;
-                const actualLoser = losers.reduce((max, player) => 
-                    player.score > max.score ? player : max, losers[0]
-                );
-                const loserIndex = gameState.players.findIndex(p => p.id === actualLoser.id);
-                gameState.history[0].loserIndex = loserIndex;
-            }
-        };
-
         const handleResetGame = async () => {
-            if (!confirm('کیا آپ واقعی نیا گیم شروع کرنا چاہتے ہیں؟ موجودہ ڈیٹا ضائع ہو جائے گا۔')) {
+            if (!db || !auth.currentUser) return;
+
+            // Use a custom modal instead of built-in confirm for consistency
+            if (!window.confirm('کیا آپ واقعی نیا گیم شروع کرنا چاہتے ہیں؟ موجودہ ڈیٹا ضائع ہو جائے گا۔')) {
                 return;
             }
             
             const playerNames = gameState.players.map(p => p.name);
-            gameState = {
+
+            const newState = {
                 ...DEFAULT_GAME_STATE,
                 players: DEFAULT_GAME_STATE.players.map((p, i) => ({
                     ...p,
                     name: playerNames[i] || p.name
                 })),
-                gameLimit: gameState.gameLimit
+                gameLimit: gameState.gameLimit,
+                // Ensure default state is used for dynamic parts
+                history: [],
+                isGameOver: false,
+                isRecorded: false,
             };
             
-            saveGameState();
-            renderGameUI();
+            await saveGameState(newState);
             setStatus('نیا گیم شروع ہو گیا!');
         };
 
-        // Data Management (Local Storage)
-        const saveGameState = () => {
+        const handleDeleteRound = async (roundIndex) => {
+            if (!db || !auth.currentUser) return;
+            if (!window.confirm('کیا آپ واقعی یہ راؤنڈ حذف کرنا چاہتے ہیں؟ اس سے تمام پچھلے سکور تبدیل ہو جائیں گے۔')) return;
+            
             try {
-                localStorage.setItem('rummyGameState', JSON.stringify(gameState));
-                localStorage.setItem('rummyUserId', userId);
+                await runTransaction(db, async (transaction) => {
+                    const gameRef = getCurrentGameRef();
+                    const doc = await transaction.get(gameRef);
+
+                    if (!doc.exists()) {
+                         throw "Document does not exist!";
+                    }
+                    
+                    const currentData = doc.data();
+                    let newHistory = Array.isArray(currentData.history) ? [...currentData.history] : [];
+                    let newPlayers = currentData.players.map(p => ({...p}));
+                    
+                    // Remove the round (index is relative to unshifted array)
+                    newHistory.splice(roundIndex, 1);
+                    
+                    // Recalculate all scores
+                    newPlayers.forEach(player => player.score = 0);
+                    
+                    [...newHistory].reverse().forEach((round, histIndex) => { // Iterate oldest to newest for cumulative score
+                         const roundNumber = newHistory.length - histIndex;
+                         const roundType = round.roundType || getRoundType(roundNumber);
+                         const multiplier = round.multiplier || getRoundMultiplier(roundType);
+                         
+                         round.scores.forEach((score, idx) => {
+                             const actualScore = score * multiplier;
+                             newPlayers[idx].score += actualScore;
+                         });
+                    });
+
+                    // Re-check game over status
+                    let isGameOver = false;
+                    const losers = newPlayers.filter(p => p.score >= currentData.gameLimit);
+                    if (losers.length > 0) {
+                        isGameOver = true;
+                        // No need to set loserIndex on a deleted round, but keep isGameOver logic clean
+                    }
+                    
+                    // Update document in transaction
+                    transaction.set(gameRef, {
+                        ...currentData,
+                        players: newPlayers,
+                        history: newHistory,
+                        isGameOver: isGameOver,
+                        isRecorded: isGameOver ? currentData.isRecorded : false, // Reset recorded status if game state changed
+                    });
+                });
+                
+                setStatus('راؤنڈ کامیابی سے حذف ہو گیا!');
+                
             } catch (error) {
-                console.error('Error saving game state:', error);
+                console.error('Error deleting round:', error);
+                setStatus('راؤنڈ حذف کرنے میں ناکامی', true);
             }
         };
 
-        const loadGameState = () => {
+        const handleSaveSettings = async () => {
+            if (!db || !auth.currentUser) return;
+
             try {
-                const savedState = localStorage.getItem('rummyGameState');
-                const savedUserId = localStorage.getItem('rummyUserId');
+                const newLimit = parseInt(ui.gameLimitInput.value) || 800;
+                const nameInputs = document.querySelectorAll('.player-name-input');
+                const updatedPlayers = gameState.players.map((player, index) => ({
+                    ...player,
+                    name: nameInputs[index].value || player.name
+                }));
                 
-                if (savedState) {
-                    gameState = JSON.parse(savedState);
-                }
-                if (savedUserId) {
-                    userId = savedUserId;
-                }
+                const newGameState = {
+                    ...gameState,
+                    players: updatedPlayers,
+                    gameLimit: newLimit,
+                };
                 
-                ui.userIdDisplay.textContent = userId.substring(0, 8) + '...';
+                // Re-check game over status with the new limit
+                newGameState.isGameOver = newGameState.players.some(p => p.score >= newLimit);
+                newGameState.isRecorded = newGameState.isGameOver ? newGameState.isRecorded : false;
+
+                await saveGameState(newGameState);
+                
+                ui.settingsModal.classList.add('hidden');
+                setStatus('ترتیبات کامیابی سے محفوظ ہو گئیں!');
+                
             } catch (error) {
-                console.error('Error loading game state:', error);
+                console.error('Error saving settings:', error);
+                setStatus('ترتیبات محفوظ کرنے میں ناکامی', true);
             }
         };
 
-        // UI Rendering
+
+        // --- UI RENDERING ---
+
         const renderGameUI = () => {
             renderScoreboard();
             renderPlayerInputs();
@@ -493,67 +648,39 @@
         };
 
         const renderScoreboard = () => {
-            if (ui.scoreboardLoading) ui.scoreboardLoading.remove();
-            ui.scoreboard.innerHTML = '';
+            const scoreboardEl = document.getElementById('scoreboard');
+            if (!scoreboardEl) return;
+
+            const existingLoading = document.getElementById('scoreboard-loading');
+            if (existingLoading) existingLoading.remove();
+
+            scoreboardEl.innerHTML = '';
             
             gameState.players.forEach(player => {
                 const progress = Math.min((player.score / gameState.gameLimit) * 100, 100);
                 const isWarning = player.score >= (gameState.gameLimit - gameState.warningThreshold);
-                const isGameOver = gameState.isGameOver;
+                const isLoser = gameState.isGameOver && player.score >= gameState.gameLimit;
                 
                 const playerCard = document.createElement('div');
                 playerCard.className = `bg-white rounded-xl shadow-sm border-2 p-4 transition-all duration-300 ${
+                    isLoser ? 'warning-blink border-red-500 bg-red-50' : 
                     isWarning ? 'warning-blink border-amber-500' : 'border-slate-200'
-                } ${isGameOver && player.score >= gameState.gameLimit ? 'bg-red-50 border-red-500' : ''}`;
+                }`;
                 
                 playerCard.innerHTML = `
-                    <h3 class="text-lg urdu-font-bold mb-2 ${isGameOver && player.score >= gameState.gameLimit ? 'text-red-700' : 'text-slate-700'}">${player.name}</h3>
-                    <p class="text-2xl urdu-font-bold mb-3 ${isGameOver && player.score >= gameState.gameLimit ? 'text-red-600' : 'text-slate-900'}">${formatScore(player.score)}</p>
+                    <h3 class="text-lg urdu-font-bold mb-2 ${isLoser ? 'text-red-700' : 'text-slate-700'}">${player.name}</h3>
+                    <p class="text-2xl urdu-font-bold mb-3 ${isLoser ? 'text-red-600' : 'text-slate-900'}">${formatScore(player.score)}</p>
                     <div class="w-full bg-slate-200 rounded-full h-3">
                         <div class="h-3 rounded-full transition-all duration-500 ${
-                            isGameOver && player.score >= gameState.gameLimit ? 'bg-red-600' : 
+                            isLoser ? 'bg-red-600' : 
                             isWarning ? 'bg-amber-500' : 'bg-cyan-600'
                         }" style="width: ${progress}%"></div>
                     </div>
                     <p class="text-xs text-slate-500 mt-2 urdu-font-normal">حد: ${formatScore(gameState.gameLimit)}</p>
                 `;
                 
-                ui.scoreboard.appendChild(playerCard);
+                scoreboardEl.appendChild(playerCard);
             });
-        };
-
-        const renderPlayerInputs = () => {
-            ui.playerInputs.innerHTML = '';
-            
-            const nextRoundNumber = gameState.history.length + 1;
-            const nextRoundType = getRoundType(nextRoundNumber);
-            const roundTypeText = getRoundTypeDisplay(nextRoundType);
-            const multiplier = getRoundMultiplier(nextRoundType);
-            
-            const badgeClass = nextRoundType === 'lucky' ? 'lucky-badge' : 'normal-badge';
-            ui.roundTypeIndicator.innerHTML = `
-                <div class="flex items-center justify-center gap-2">
-                    <span>اگلا راؤنڈ:</span>
-                    <span class="px-3 py-1 rounded urdu-font-bold ${badgeClass}">${roundTypeText}</span>
-                    ${multiplier > 1 ? `<span class="text-sm text-amber-600">(سکور ${multiplier} گنا ہوں گے)</span>` : ''}
-                </div>
-            `;
-            
-            gameState.players.forEach(player => {
-                const inputGroup = document.createElement('div');
-                inputGroup.className = 'flex flex-col';
-                inputGroup.innerHTML = `
-                    <label class="text-sm urdu-font-normal text-slate-600 mb-1">${player.name}</label>
-                    <input type="number" 
-                           class="score-input w-full p-3 border border-slate-300 rounded-lg text-lg text-center" 
-                           min="0" 
-                           placeholder="0" 
-                           inputmode="numeric">
-                `;
-                ui.playerInputs.appendChild(inputGroup);
-            });
-            
-            validateScoreInputs();
         };
 
         const renderHistory = () => {
@@ -571,7 +698,8 @@
                 const historyItem = document.createElement('div');
                 historyItem.className = 'history-item relative p-4 hover:bg-slate-50 transition-colors';
                 
-                const roundNumber = gameState.history.length - roundIndex;
+                const totalRounds = gameState.history.length;
+                const roundNumber = totalRounds - roundIndex; // Display round number from 1 to N
                 const date = new Date(round.timestamp);
                 const timeString = date.toLocaleTimeString('ur-PK', { 
                     hour: '2-digit', 
@@ -616,36 +744,75 @@
                 `;
                 
                 const deleteBtn = historyItem.querySelector('.delete-btn');
-                deleteBtn.addEventListener('click', async () => {
-                    if (!confirm('کیا آپ واقعی یہ راؤنڈ حذف کرنا چاہتے ہیں؟')) return;
-                    
-                    try {
-                        gameState.history.splice(roundIndex, 1);
-                        gameState.players.forEach(player => player.score = 0);
-                        gameState.history.forEach((histRound, histIndex) => {
-                            const histRoundNumber = gameState.history.length - histIndex;
-                            const histRoundType = histRound.roundType || getRoundType(histRoundNumber);
-                            const histMultiplier = histRound.multiplier || getRoundMultiplier(histRoundType);
-                            
-                            histRound.scores.forEach((score, idx) => {
-                                gameState.players[idx].score += score * histMultiplier;
-                            });
-                        });
-                        
-                        gameState.isGameOver = false;
-                        checkGameOver();
-                        saveGameState();
-                        renderGameUI();
-                        setStatus('راؤنڈ کامیابی سے حذف ہو گیا!');
-                        
-                    } catch (error) {
-                        console.error('Error deleting round:', error);
-                        setStatus('راؤنڈ حذف کرنے میں ناکامی', true);
-                    }
-                });
+                // Use a closure to pass the current index
+                deleteBtn.addEventListener('click', () => handleDeleteRound(roundIndex));
                 
                 ui.historyList.appendChild(historyItem);
             });
+        };
+
+        const updateGameStatus = () => {
+            ui.limitDisplayHeader.textContent = formatScore(gameState.gameLimit);
+            
+            // Re-enable/disable input buttons
+            ui.saveScoreBtn.disabled = gameState.isGameOver || !validateScoreInputs();
+            
+            if (gameState.isGameOver) {
+                const losers = gameState.players.filter(p => p.score >= gameState.gameLimit);
+                const loserNames = losers.map(p => p.name).join('، ');
+                
+                ui.gameOverMessage.classList.remove('hidden');
+                ui.gameOverMessage.querySelector('p').textContent = 
+                    `گیم ختم! ${loserNames} نے حد ${formatScore(gameState.gameLimit)} پار کر لی۔`;
+                
+                ui.resetGameBtn.classList.remove('hidden');
+                ui.recordGameBtn.classList.remove('hidden');
+                
+                ui.recordGameBtn.disabled = gameState.isRecorded;
+                ui.resetGameBtn.disabled = false;
+                
+                ui.gameStatus.innerHTML = `<span class="text-red-600 urdu-font-bold">گیم ختم! ${loserNames} ہار گئے۔</span>`;
+            } else {
+                ui.gameOverMessage.classList.add('hidden');
+                ui.resetGameBtn.classList.add('hidden');
+                ui.recordGameBtn.classList.add('hidden');
+                ui.gameStatus.textContent = `کھیل جاری ہے، حد ${formatScore(gameState.gameLimit)} ہے۔`;
+            }
+        };
+        
+        // Render functions not modified by Firebase migration (kept for completeness)
+        const renderPlayerInputs = () => {
+            ui.playerInputs.innerHTML = '';
+            
+            const nextRoundNumber = gameState.history.length + 1;
+            const nextRoundType = getRoundType(nextRoundNumber);
+            const roundTypeText = getRoundTypeDisplay(nextRoundType);
+            const multiplier = getRoundMultiplier(nextRoundType);
+            
+            const badgeClass = nextRoundType === 'lucky' ? 'lucky-badge' : 'normal-badge';
+            ui.roundTypeIndicator.innerHTML = `
+                <div class="flex items-center justify-center gap-2">
+                    <span>اگلا راؤنڈ:</span>
+                    <span class="px-3 py-1 rounded urdu-font-bold ${badgeClass}">${roundTypeText}</span>
+                    ${multiplier > 1 ? `<span class="text-sm text-amber-600 mr-2">(سکور ${multiplier} گنا ہوں گے)</span>` : ''}
+                </div>
+            `;
+            
+            gameState.players.forEach(player => {
+                const inputGroup = document.createElement('div');
+                inputGroup.className = 'flex flex-col';
+                inputGroup.innerHTML = `
+                    <label class="text-sm urdu-font-normal text-slate-600 mb-1">${player.name}</label>
+                    <input type="number" 
+                           class="score-input w-full p-3 border border-slate-300 rounded-lg text-lg text-center" 
+                           min="0" 
+                           placeholder="0" 
+                           inputmode="numeric">
+                `;
+                ui.playerInputs.appendChild(inputGroup);
+            });
+            
+            validateScoreInputs();
         };
 
         const renderSettingsModal = () => {
@@ -666,56 +833,6 @@
             });
         };
 
-        const handleSaveSettings = async () => {
-            try {
-                const newLimit = parseInt(ui.gameLimitInput.value) || 800;
-                const nameInputs = document.querySelectorAll('.player-name-input');
-                const updatedPlayers = gameState.players.map((player, index) => ({
-                    ...player,
-                    name: nameInputs[index].value || player.name
-                }));
-                
-                gameState.players = updatedPlayers;
-                gameState.gameLimit = newLimit;
-                
-                if (!gameState.isGameOver) {
-                    checkGameOver();
-                }
-                
-                saveGameState();
-                renderGameUI();
-                ui.settingsModal.classList.add('hidden');
-                setStatus('ترتیبات کامیابی سے محفوظ ہو گئیں!');
-                
-            } catch (error) {
-                console.error('Error saving settings:', error);
-                setStatus('ترتیبات محفوظ کرنے میں ناکامی', true);
-            }
-        };
-
-        const updateGameStatus = () => {
-            ui.limitDisplayHeader.textContent = formatScore(gameState.gameLimit);
-            
-            if (gameState.isGameOver) {
-                const losers = gameState.players.filter(p => p.score >= gameState.gameLimit);
-                const loserNames = losers.map(p => p.name).join('، ');
-                
-                ui.gameOverMessage.classList.remove('hidden');
-                ui.gameOverMessage.querySelector('p').textContent = 
-                    `گیم ختم! ${loserNames} نے حد ${formatScore(gameState.gameLimit)} پار کر لی۔`;
-                
-                ui.resetGameBtn.classList.remove('hidden');
-                ui.recordGameBtn.classList.remove('hidden');
-                
-                ui.gameStatus.innerHTML = `<span class="text-red-600">گیم ختم! ${loserNames} ہار گئے۔</span>`;
-            } else {
-                ui.gameOverMessage.classList.add('hidden');
-                ui.resetGameBtn.classList.add('hidden');
-                ui.recordGameBtn.classList.add('hidden');
-                ui.gameStatus.textContent = `کھیل جاری ہے، حد ${formatScore(gameState.gameLimit)} ہے۔`;
-            }
-        };
-
         const updateChart = () => {
             const ctx = ui.chartCanvas.getContext('2d');
             
@@ -724,6 +841,8 @@
             }
             
             if (gameState.history.length === 0) {
+                // Clear canvas before drawing
+                ctx.clearRect(0, 0, ui.chartCanvas.width, ui.chartCanvas.height);
                 ctx.font = "16px 'Noto Nastaliq Urdu'";
                 ctx.fillStyle = '#94a3b8';
                 ctx.textAlign = 'center';
@@ -736,6 +855,7 @@
                 const cumulativeScores = [];
                 let runningTotal = 0;
                 
+                // Iterate oldest to newest (reversed array) for cumulative graph
                 [...gameState.history].reverse().forEach((round, roundIndex) => {
                     const roundType = round.roundType || getRoundType(roundIndex + 1);
                     const multiplier = round.multiplier || getRoundMultiplier(roundType);
@@ -796,47 +916,71 @@
             return colors[index % colors.length];
         };
 
-        // Records functionality (simplified for local storage)
-        const handleRecordGame = () => {
-            if (!gameState.isGameOver || gameState.isRecorded) return;
+        // --- RECORDS FUNCTIONALITY (Firestore) ---
+
+        const handleRecordGame = async () => {
+            if (!gameState.isGameOver || gameState.isRecorded || isSaving || !db || !auth.currentUser) return;
             
+            ui.recordGameBtn.disabled = true;
+            ui.recordText.textContent = 'ریکارڈ ہو رہا ہے...';
+            ui.recordSpinner.classList.remove('hidden');
+
             try {
-                const records = JSON.parse(localStorage.getItem('rummyRecords') || '[]');
+                const recordsCollectionRef = getRecordsCollectionRef();
                 const gameRecord = {
-                    timestamp: new Date(),
+                    timestamp: new Date().toISOString(),
                     players: gameState.players,
                     gameLimit: gameState.gameLimit,
                     history: gameState.history,
                     finalScores: gameState.players.map(p => p.score),
-                    userId: userId
+                    userId: userId,
+                    playerNames: gameState.players.map(p => p.name).join(', ')
                 };
                 
-                records.unshift(gameRecord);
-                localStorage.setItem('rummyRecords', JSON.stringify(records));
+                await addDoc(recordsCollectionRef, gameRecord);
                 
                 gameState.isRecorded = true;
-                saveGameState();
+                await saveGameState(); // Update current game state to mark as recorded
                 
                 setStatus('گیم کامیابی سے ریکارڈ ہو گئی!');
-                fetchAndRenderRecords(true);
+                await fetchAndRenderRecords(true);
                 
             } catch (error) {
-                console.error('Error recording game:', error);
+                console.error('Error recording game to Firestore:', error);
                 setStatus('گیم ریکارڈ کرنے میں ناکامی', true);
+            } finally {
+                ui.recordGameBtn.disabled = gameState.isRecorded;
+                ui.recordText.textContent = 'گیم ریکارڈ کریں';
+                ui.recordSpinner.classList.add('hidden');
             }
         };
 
-        const fetchAndRenderRecords = (showRefresh = false) => {
+        const fetchAndRenderRecords = async (showRefresh = false) => {
+            if (!db || !auth.currentUser) return;
+
             try {
                 if (showRefresh) {
                     ui.recordsList.innerHTML = '<p class="text-center text-slate-500 urdu-font-normal">تازہ ہو رہا ہے...</p>';
                 }
                 
-                const records = JSON.parse(localStorage.getItem('rummyRecords') || '[]');
+                const recordsCollectionRef = getRecordsCollectionRef();
+                // Firestore queries: Cannot use orderBy() here as it requires an index, 
+                // so we fetch all and sort client-side.
+                const q = query(recordsCollectionRef); 
+                const querySnapshot = await getDocs(q);
+                
+                let records = [];
+                querySnapshot.forEach(doc => {
+                    records.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // Sort by timestamp descending (most recent first)
+                records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
                 renderRecordsList(records);
                 
             } catch (error) {
-                console.error('Error fetching records:', error);
+                console.error('Error fetching records from Firestore:', error);
                 ui.recordsList.innerHTML = '<p class="text-center text-red-500 urdu-font-normal">ریکارڈز لوڈ ہونے میں ناکامی۔</p>';
             }
         };
@@ -875,7 +1019,7 @@
                             <div class="flex justify-between items-center ${player.id === winner.id ? 'bg-green-50 -mx-2 px-2 py-1 rounded' : ''}">
                                 <span class="urdu-font-normal ${player.id === winner.id ? 'text-green-700 font-bold' : 'text-slate-600'}">
                                     ${player.name}
-                                    ${player.id === winner.id ? '👑' : player.id === loser.id ? '💀' : ''}
+                                    ${player.id === winner.id ? ' 👑' : player.id === loser.id ? ' 💀' : ''}
                                 </span>
                                 <span class="urdu-font-bold ${player.id === winner.id ? 'text-green-600' : player.id === loser.id ? 'text-red-600' : 'text-slate-700'}">${formatScore(player.score)}</span>
                             </div>
@@ -960,17 +1104,47 @@
             ui.recordDetailsModal.classList.remove('hidden');
         };
 
-        // Initialize
-        const init = () => {
+        // --- INITIALIZATION ---
+
+        const init = async () => {
             initializeEventListeners();
-            loadGameState();
-            renderGameUI();
             
-            // Hide loading after a short delay
-            setTimeout(() => {
-                ui.loadingOverlay.classList.add('opacity-0');
-                setTimeout(() => ui.loadingOverlay.classList.add('hidden'), 500);
-            }, 1000);
+            // 1. Initialize Firebase
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                // setLogLevel('Debug'); // Uncomment for debugging
+                
+                // 2. Authenticate
+                ui.authStatus.textContent = 'تصدیق کی جا رہی ہے...';
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                userId = auth.currentUser?.uid || 'anonymous';
+                ui.userIdDisplay.textContent = userId;
+                ui.authStatus.textContent = `تصدیق ہو گئی! (${auth.currentUser?.isAnonymous ? 'مہمان' : 'یوزر'})`;
+                
+                // 3. Set up snapshot listener for game state (handles initial load and future changes)
+                await setupGameStateListener();
+                
+                // 4. Initial load of records
+                await fetchAndRenderRecords(false);
+
+            } catch (error) {
+                console.error("Firebase Init Error:", error);
+                ui.authStatus.textContent = 'Firebase میں خرابی! ڈیٹا محفوظ نہیں ہو گا.';
+                
+                // If Firebase fails, show UI with default state after a delay
+                renderGameUI();
+                setTimeout(() => {
+                    ui.loadingOverlay.classList.add('opacity-0');
+                    setTimeout(() => ui.loadingOverlay.classList.add('hidden'), 500);
+                }, 1000);
+            }
         };
 
         // Start the application
@@ -978,3 +1152,4 @@
     </script>
 </body>
 </html>
+
