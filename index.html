@@ -45,6 +45,106 @@
         .grid-cols-player-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         .grid-cols-player-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
         .grid-cols-player-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+
+        /* Statistics Modal Styles */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        .player-stats {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid #06b6d4;
+        }
+        .progress-bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #06b6d4, #3b82f6);
+            transition: width 0.3s ease;
+        }
+
+        /* Game Lock Styles */
+        .view-only-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .view-only-modal {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            text-align: center;
+            max-width: 500px;
+            margin: 1rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .new-game-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .new-game-btn {
+            padding: 1rem;
+            border: 2px solid #06b6d4;
+            border-radius: 12px;
+            background: white;
+            color: #06b6d4;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .new-game-btn:hover {
+            background: #06b6d4;
+            color: white;
+        }
+        .game-lock-banner {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            text-align: center;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body class="text-slate-800">
@@ -69,6 +169,13 @@
             </div>
             <div class="flex items-center gap-2">
                 <span id="sync-status" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded urdu-font-normal">🔄 کلاؤڈ سینک</span>
+                <button id="stats-btn" class="p-3 rounded-full hover:bg-slate-200 transition-colors duration-200" aria-label="شماریات">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-600">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                </button>
                 <button id="settings-btn" aria-label="ترتیبات" class="p-3 rounded-full hover:bg-slate-200 transition-colors duration-200">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-600"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                 </button>
@@ -182,6 +289,27 @@
                         <!-- Dynamic player name inputs will be rendered here -->
                     </div>
                 </div>
+
+                <!-- NEW GAME OPTIONS SECTION -->
+                <div class="mt-6 pt-6 border-t border-slate-200">
+                    <h3 class="text-lg urdu-font-bold mb-4 text-slate-800">نئی گیم کے اختیارات</h3>
+                    
+                    <div class="space-y-3 mb-4">
+                        <div id="custom-player-names">
+                            <label class="block text-sm urdu-font-normal text-slate-600 mb-2">کھلاڑیوں کے نئے نام</label>
+                            <div id="new-player-name-inputs">
+                                <!-- Dynamic new player name inputs will be rendered here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button id="create-new-game-btn" class="w-full bg-green-600 text-white urdu-font-bold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors duration-200">
+                        🆕 علیحدہ نئی گیم شروع کریں
+                    </button>
+                    <p class="text-xs text-slate-500 urdu-font-normal mt-2 text-center">
+                        یہ گیم موجودہ گیم سے علیحدہ ڈیٹا بیس میں محفوظ ہوگی
+                    </p>
+                </div>
             </div>
             <div class="mt-8 flex justify-end gap-4">
                 <button id="cancel-settings-btn" class="px-4 py-2 bg-slate-200 text-slate-800 urdu-font-normal rounded-lg hover:bg-slate-300 transition-colors">منسوخ</button>
@@ -197,6 +325,49 @@
             <div id="record-details-content"></div>
             <div class="mt-8 flex justify-end">
                 <button id="close-record-details-btn" class="px-4 py-2 bg-slate-200 text-slate-800 urdu-font-normal rounded-lg hover:bg-slate-300 transition-colors">بند کریں</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Modal -->
+    <div id="stats-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <h2 class="text-2xl urdu-font-bold mb-6 text-center">گیم کا خلاصہ اور شماریات</h2>
+            
+            <div id="stats-content">
+                <!-- Statistics will be rendered here -->
+            </div>
+            
+            <div class="mt-8 flex justify-end gap-4">
+                <button id="close-stats-btn" class="px-4 py-2 bg-slate-200 text-slate-800 urdu-font-normal rounded-lg hover:bg-slate-300 transition-colors">بند کریں</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Lock Modal -->
+    <div id="game-lock-modal" class="view-only-overlay hidden">
+        <div class="view-only-modal">
+            <div class="text-3xl mb-4">🎮</div>
+            <h2 class="text-2xl urdu-font-bold mb-4 text-slate-800">گیم پہلے سے چل رہی ہے</h2>
+            <p class="urdu-font-normal text-slate-600 mb-4">
+                ایک گیم پہلے ہی کسی اور ڈیوائس پر چل رہی ہے۔ آپ اس گیم کو صرف دیکھ سکتے ہیں، اس میں تبدیلی نہیں کر سکتے۔
+            </p>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <p class="urdu-font-bold text-yellow-800">موجودہ گیم کی معلومات:</p>
+                <p id="current-game-info" class="urdu-font-normal text-yellow-700 text-sm mt-2">لوڈ ہو رہا ہے...</p>
+            </div>
+            
+            <div class="new-game-options">
+                <button id="view-game-btn" class="new-game-btn">
+                    <div class="text-xl mb-2">👁️</div>
+                    <div class="urdu-font-bold">گیم دیکھیں</div>
+                    <div class="urdu-font-normal text-xs mt-1">(صرف دیکھنے کے لیے)</div>
+                </button>
+                <button id="new-game-btn" class="new-game-btn">
+                    <div class="text-xl mb-2">🆕</div>
+                    <div class="urdu-font-bold">نئی گیم</div>
+                    <div class="urdu-font-normal text-xs mt-1">(علیحدہ ڈیٹا بیس)</div>
+                </button>
             </div>
         </div>
     </div>
@@ -229,6 +400,11 @@
         let gameState = {...DEFAULT_GAME_STATE};
         let userId = null;
         let isOnline = false;
+
+        // ==================== MULTI-DEVICE GAME LOCK SYSTEM ====================
+        let currentGameSession = null;
+        let isViewOnlyMode = false;
+        let gameLockModal, viewGameBtn, newGameBtn, currentGameInfo;
 
         // ==================== UI ELEMENTS ====================
         const ui = {
@@ -269,7 +445,14 @@
             // New UI elements for dynamic player count management
             addPlayerBtn: document.getElementById('add-player-btn'), 
             removePlayerBtn: document.getElementById('remove-player-btn'), 
-            playerNameInputsContainer: document.getElementById('player-name-inputs-container') 
+            playerNameInputsContainer: document.getElementById('player-name-inputs-container'),
+            // Statistics and Game Lock UI elements
+            statsBtn: document.getElementById('stats-btn'),
+            statsModal: document.getElementById('stats-modal'),
+            statsContent: document.getElementById('stats-content'),
+            closeStatsBtn: document.getElementById('close-stats-btn'),
+            createNewGameBtn: document.getElementById('create-new-game-btn'),
+            newPlayerNameInputs: document.getElementById('new-player-name-inputs')
         };
 
         let scoreChart;
@@ -319,6 +502,472 @@
             if (playerCount === 6) return 'grid-cols-6';
             // Default for 4 players or other fallbacks
             return 'grid-cols-2 md:grid-cols-4'; 
+        };
+
+        // ==================== MULTI-DEVICE GAME LOCK SYSTEM ====================
+
+        // Initialize game lock system
+        const initializeGameLockSystem = () => {
+            gameLockModal = document.getElementById('game-lock-modal');
+            viewGameBtn = document.getElementById('view-game-btn');
+            newGameBtn = document.getElementById('new-game-btn');
+            currentGameInfo = document.getElementById('current-game-info');
+            
+            viewGameBtn.addEventListener('click', enterViewOnlyMode);
+            newGameBtn.addEventListener('click', createNewGameSession);
+        };
+
+        // Check if there's an active game session
+        const checkActiveGameSession = async () => {
+            if (!isOnline) {
+                // In offline mode, use localStorage to check for active game
+                const activeSession = localStorage.getItem('rummy_active_session');
+                if (activeSession) {
+                    const sessionData = JSON.parse(activeSession);
+                    // Check if session is still active (last update within 5 minutes)
+                    const lastUpdate = new Date(sessionData.lastUpdated);
+                    const now = new Date();
+                    const minutesDiff = (now - lastUpdate) / (1000 * 60);
+                    
+                    if (minutesDiff < 5 && !sessionData.isGameOver) {
+                        return sessionData;
+                    }
+                }
+                return null;
+            }
+
+            try {
+                // Check for active game sessions in Supabase
+                const { data: activeSessions, error } = await supabase
+                    .from('rummy_sessions')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('last_updated', { ascending: false })
+                    .limit(1);
+
+                if (error) throw error;
+
+                if (activeSessions && activeSessions.length > 0) {
+                    const activeSession = activeSessions[0];
+                    // Check if session belongs to current user or is a shared session
+                    if (activeSession.user_id !== userId) {
+                        return activeSession;
+                    }
+                }
+                return null;
+            } catch (error) {
+                console.error('Error checking active sessions:', error);
+                return null;
+            }
+        };
+
+        // Create a new game session
+        const createNewGameSession = async () => {
+            const sessionId = 'session_' + Date.now();
+            
+            currentGameSession = {
+                id: sessionId,
+                userId: userId,
+                isActive: true,
+                lastUpdated: new Date().toISOString(),
+                playerNames: gameState.players.map(p => p.name),
+                gameLimit: gameState.gameLimit
+            };
+
+            // Save to appropriate storage
+            if (isOnline) {
+                try {
+                    const { data, error } = await supabase
+                        .from('rummy_sessions')
+                        .insert([{
+                            id: sessionId,
+                            user_id: userId,
+                            is_active: true,
+                            last_updated: new Date().toISOString(),
+                            game_data: gameState,
+                            player_names: gameState.players.map(p => p.name),
+                            game_limit: gameState.gameLimit
+                        }]);
+
+                    if (error) throw error;
+                } catch (error) {
+                    console.error('Error creating session:', error);
+                    // Fallback to localStorage
+                    localStorage.setItem('rummy_active_session', JSON.stringify(currentGameSession));
+                }
+            } else {
+                localStorage.setItem('rummy_active_session', JSON.stringify(currentGameSession));
+            }
+
+            // Close the modal and continue with normal game
+            gameLockModal.classList.add('hidden');
+            setStatus('نئی گیم شروع ہو گئی! یہ گیم علیحدہ ڈیٹا بیس میں محفوظ ہوگی۔');
+        };
+
+        // Enter view-only mode
+        const enterViewOnlyMode = () => {
+            isViewOnlyMode = true;
+            gameLockModal.classList.add('hidden');
+            setupViewOnlyMode();
+            setStatus('آپ ویو اونلی موڈ میں ہیں۔ گیم دیکھ سکتے ہیں لیکن تبدیلی نہیں کر سکتے۔');
+        };
+
+        // Setup view-only mode UI
+        const setupViewOnlyMode = () => {
+            // Add view-only banner
+            const banner = document.createElement('div');
+            banner.className = 'game-lock-banner';
+            banner.innerHTML = `
+                <div class="flex items-center justify-center gap-3">
+                    <span class="text-xl">👁️</span>
+                    <span class="urdu-font-bold">ویو اونلی موڈ - گیم پہلے سے چل رہی ہے</span>
+                    <button id="exit-view-btn" class="bg-white text-red-600 px-3 py-1 rounded-lg text-sm urdu-font-normal hover:bg-red-50 transition-colors">
+                        نئی گیم شروع کریں
+                    </button>
+                </div>
+            `;
+            
+            document.querySelector('main').prepend(banner);
+            
+            // Add event listener to exit button
+            document.getElementById('exit-view-btn').addEventListener('click', () => {
+                if (confirm('کیا آپ واقعی نئی گیم شروع کرنا چاہتے ہیں؟ موجودہ گیم کی نقل آپ کی ڈیوائس پر محفوظ ہوگی۔')) {
+                    location.reload(); // Reload to start fresh
+                }
+            });
+
+            // Disable all interactive elements
+            disableInteractiveElements();
+        };
+
+        // Disable interactive elements in view-only mode
+        const disableInteractiveElements = () => {
+            // Disable score inputs
+            const scoreInputs = document.querySelectorAll('.score-input');
+            scoreInputs.forEach(input => {
+                input.disabled = true;
+                input.placeholder = 'ویو اونلی';
+            });
+
+            // Disable buttons
+            ui.saveScoreBtn.disabled = true;
+            ui.settingsBtn.disabled = true;
+            ui.resetGameBtn.disabled = true;
+            ui.recordGameBtn.disabled = true;
+
+            // Change button texts to indicate view-only mode
+            ui.saveScoreBtn.textContent = 'ویو اونلی موڈ';
+            ui.saveScoreBtn.style.background = '#9ca3af';
+        };
+
+        // Update game session periodically
+        const updateGameSession = async () => {
+            if (!currentGameSession || isViewOnlyMode) return;
+
+            currentGameSession.lastUpdated = new Date().toISOString();
+            currentGameSession.gameData = gameState;
+
+            if (isOnline) {
+                try {
+                    await supabase
+                        .from('rummy_sessions')
+                        .update({
+                            last_updated: currentGameSession.lastUpdated,
+                            game_data: currentGameSession.gameData,
+                            is_active: !gameState.isGameOver
+                        })
+                        .eq('id', currentGameSession.id);
+                } catch (error) {
+                    console.error('Error updating session:', error);
+                }
+            } else {
+                localStorage.setItem('rummy_active_session', JSON.stringify(currentGameSession));
+            }
+        };
+
+        // Check for active session on startup
+        const checkSessionOnStartup = async () => {
+            const activeSession = await checkActiveGameSession();
+            
+            if (activeSession && activeSession.user_id !== userId) {
+                // Show game lock modal
+                showGameLockModal(activeSession);
+                return true;
+            }
+            
+            return false;
+        };
+
+        // Show game lock modal with session info
+        const showGameLockModal = (session) => {
+            const playerNames = session.player_names || session.playerNames || ['نامعلوم'];
+            const gameLimit = session.game_limit || session.gameLimit || 800;
+            
+            currentGameInfo.textContent = 
+                `${playerNames.join(', ')} - حد: ${gameLimit} | آخری اپ ڈیٹ: ${new Date(session.last_updated || session.lastUpdated).toLocaleTimeString('ur-PK')}`;
+            
+            gameLockModal.classList.remove('hidden');
+        };
+
+        // ==================== MULTIPLE GAMES SUPPORT ====================
+
+        // New function to create independent game
+        const createIndependentGame = async (customPlayerNames = null) => {
+            // Generate unique session ID
+            const sessionId = 'independent_' + Date.now();
+            
+            // Create new game state with custom players or default
+            const newGameState = {
+                ...DEFAULT_GAME_STATE,
+                players: customPlayerNames ? 
+                    customPlayerNames.map((name, index) => ({
+                        id: 'p' + (index + 1),
+                        name: name,
+                        score: 0
+                    })) : 
+                    DEFAULT_GAME_STATE.players,
+                sessionId: sessionId,
+                isIndependent: true
+            };
+
+            // Save to independent storage
+            if (isOnline) {
+                try {
+                    const { data, error } = await supabase
+                        .from('rummy_independent_games')
+                        .insert([{
+                            id: sessionId,
+                            user_id: userId,
+                            game_data: newGameState,
+                            created_at: new Date().toISOString(),
+                            is_active: true
+                        }]);
+
+                    if (error) throw error;
+                } catch (error) {
+                    console.error('Error creating independent game:', error);
+                }
+            } else {
+                // Save to localStorage for independent games
+                const independentGames = JSON.parse(localStorage.getItem('rummy_independent_games') || '[]');
+                independentGames.unshift({
+                    id: sessionId,
+                    user_id: userId,
+                    game_data: newGameState,
+                    created_at: new Date().toISOString(),
+                    is_active: true
+                });
+                localStorage.setItem('rummy_independent_games', JSON.stringify(independentGames));
+            }
+
+            // Update current game state
+            gameState = newGameState;
+            currentGameSession = {
+                id: sessionId,
+                userId: userId,
+                isActive: true,
+                isIndependent: true,
+                lastUpdated: new Date().toISOString()
+            };
+
+            return newGameState;
+        };
+
+        // ==================== STATISTICS SYSTEM ====================
+
+        // Initialize statistics modal
+        const initializeStatsModal = () => {
+            ui.statsBtn.addEventListener('click', showGameStatistics);
+            ui.closeStatsBtn.addEventListener('click', () => {
+                ui.statsModal.classList.add('hidden');
+            });
+        };
+
+        // Show game statistics
+        const showGameStatistics = () => {
+            if (gameState.history.length === 0) {
+                ui.statsContent.innerHTML = `
+                    <div class="text-center py-8">
+                        <p class="text-slate-500 urdu-font-normal text-lg">ابھی تک کوئی ڈیٹا موجود نہیں ہے۔</p>
+                        <p class="text-slate-400 urdu-font-normal mt-2">کچھ راؤنڈ کھیلیں تاکہ شماریات دیکھ سکیں۔</p>
+                    </div>
+                `;
+                ui.statsModal.classList.remove('hidden');
+                return;
+            }
+
+            const stats = calculateGameStatistics();
+            renderStatistics(stats);
+            ui.statsModal.classList.remove('hidden');
+        };
+
+        // Calculate comprehensive game statistics
+        const calculateGameStatistics = () => {
+            const stats = {
+                totalRounds: gameState.history.length,
+                totalScore: 0,
+                luckyRounds: 0,
+                normalRounds: 0,
+                playerStats: [],
+                gameDuration: calculateGameDuration(),
+                averageScores: {}
+            };
+
+            // Calculate round types
+            gameState.history.forEach(round => {
+                stats.totalScore += round.actualScores.reduce((a, b) => a + b, 0);
+                if (round.roundType === 'lucky') {
+                    stats.luckyRounds++;
+                } else {
+                    stats.normalRounds++;
+                }
+            });
+
+            // Calculate player-specific statistics
+            stats.playerStats = gameState.players.map((player, index) => {
+                const playerRounds = gameState.history.map(round => ({
+                    score: round.scores[index],
+                    actualScore: round.actualScores[index],
+                    roundType: round.roundType,
+                    isZero: round.scores[index] === 0
+                }));
+
+                const zeroRounds = playerRounds.filter(round => round.isZero).length;
+                const totalScore = playerRounds.reduce((sum, round) => sum + round.actualScore, 0);
+                const averageScore = totalScore / stats.totalRounds;
+                const maxScore = Math.max(...playerRounds.map(round => round.actualScore));
+                const minScore = Math.min(...playerRounds.map(round => round.actualScore));
+
+                return {
+                    name: player.name,
+                    currentScore: player.score,
+                    totalScore,
+                    averageScore,
+                    maxScore,
+                    minScore,
+                    zeroRounds,
+                    winPercentage: ((zeroRounds / stats.totalRounds) * 100).toFixed(1)
+                };
+            });
+
+            // Calculate overall averages
+            stats.averageScores = {
+                perRound: stats.totalScore / stats.totalRounds,
+                perPlayer: stats.totalScore / (stats.totalRounds * gameState.players.length)
+            };
+
+            return stats;
+        };
+
+        // Calculate game duration
+        const calculateGameDuration = () => {
+            if (gameState.history.length === 0) return 'N/A';
+            
+            const firstRound = gameState.history[gameState.history.length - 1].timestamp;
+            const lastRound = gameState.history[0].timestamp;
+            const duration = new Date(lastRound) - new Date(firstRound);
+            
+            const hours = Math.floor(duration / (1000 * 60 * 60));
+            const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+            
+            return hours > 0 ? `${hours} گھنٹے ${minutes} منٹ` : `${minutes} منٹ`;
+        };
+
+        // Render statistics
+        const renderStatistics = (stats) => {
+            const highestScorer = [...stats.playerStats].sort((a, b) => b.currentScore - a.currentScore)[0];
+            const mostZeros = [...stats.playerStats].sort((a, b) => b.zeroRounds - a.zeroRounds)[0];
+            const bestAverage = [...stats.playerStats].sort((a, b) => a.averageScore - b.averageScore)[0];
+
+            ui.statsContent.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">کل راؤنڈز</div>
+                        <div class="stat-value">${stats.totalRounds}</div>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <div class="stat-label">لکی گیمز</div>
+                        <div class="stat-value">${stats.luckyRounds}</div>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <div class="stat-label">سادہ گیمز</div>
+                        <div class="stat-value">${stats.normalRounds}</div>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                        <div class="stat-label">کل وقت</div>
+                        <div class="stat-value">${stats.gameDuration}</div>
+                    </div>
+                </div>
+
+                <div class="bg-cyan-50 border border-cyan-200 rounded-xl p-4 mb-6">
+                    <h3 class="text-lg urdu-font-bold text-cyan-800 mb-3">کلیدی کارکردگی</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div class="text-center">
+                            <div class="urdu-font-normal text-cyan-600">سب سے زیادہ اسکور</div>
+                            <div class="urdu-font-bold text-cyan-800">${highestScorer.name}</div>
+                            <div class="text-xs text-cyan-600">${formatScore(highestScorer.currentScore)} پوائنٹس</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="urdu-font-normal text-cyan-600">سب سے زیادہ جیت</div>
+                            <div class="urdu-font-bold text-cyan-800">${mostZeros.name}</div>
+                            <div class="text-xs text-cyan-600">${mostZeros.zeroRounds} راؤنڈ (${mostZeros.winPercentage}%)</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="urdu-font-normal text-cyan-600">بہترین اوسط</div>
+                            <div class="urdu-font-bold text-cyan-800">${bestAverage.name}</div>
+                            <div class="text-xs text-cyan-600">${formatScore(Math.round(bestAverage.averageScore))} فی راؤنڈ</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="text-xl urdu-font-bold mb-4">کھلاڑیوں کی تفصیلی کارکردگی</h3>
+                <div class="space-y-4">
+                    ${stats.playerStats.map(playerStat => `
+                        <div class="player-stats">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="urdu-font-bold text-lg text-slate-800">${playerStat.name}</h4>
+                                <span class="urdu-font-bold text-cyan-600">${formatScore(playerStat.currentScore)} پوائنٹس</span>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
+                                <div>
+                                    <div class="urdu-font-normal text-slate-600">اوسط اسکور</div>
+                                    <div class="urdu-font-bold text-slate-800">${formatScore(Math.round(playerStat.averageScore))}</div>
+                                </div>
+                                <div>
+                                    <div class="urdu-font-normal text-slate-600">جیت کے راؤنڈ</div>
+                                    <div class="urdu-font-bold text-slate-800">${playerStat.zeroRounds} (${playerStat.winPercentage}%)</div>
+                                </div>
+                                <div>
+                                    <div class="urdu-font-normal text-slate-600">زیادہ سے زیادہ</div>
+                                    <div class="urdu-font-bold text-slate-800">${formatScore(playerStat.maxScore)}</div>
+                                </div>
+                                <div>
+                                    <div class="urdu-font-normal text-slate-600">کم سے کم</div>
+                                    <div class="urdu-font-bold text-slate-800">${formatScore(playerStat.minScore)}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center gap-2 text-xs text-slate-600">
+                                <span class="urdu-font-normal">حد تک پہنچنا:</span>
+                                <div class="flex-1 progress-bar">
+                                    <div class="progress-fill" style="width: ${(playerStat.currentScore / gameState.gameLimit) * 100}%"></div>
+                                </div>
+                                <span class="urdu-font-normal">${Math.round((playerStat.currentScore / gameState.gameLimit) * 100)}%</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="mt-6 p-4 bg-slate-50 rounded-xl">
+                    <h4 class="urdu-font-bold text-slate-800 mb-2">گیم کا خلاصہ</h4>
+                    <p class="urdu-font-normal text-slate-600 text-sm">
+                        کل ${stats.totalRounds} راؤنڈ کھیلے گئے، جن میں سے ${stats.luckyRounds} لکی گیمز تھیں۔ 
+                        اوسطاً ہر راؤنڈ میں ${formatScore(Math.round(stats.averageScores.perRound))} پوائنٹس تقسیم ہوئے۔
+                        ${gameState.isGameOver ? 'گیم مکمل ہو چکی ہے۔' : 'گیم جاری ہے۔'}
+                    </p>
+                </div>
+            `;
         };
 
         // ==================== SUPABASE AUTHENTICATION ====================
@@ -533,6 +1182,9 @@
             ui.addPlayerBtn.addEventListener('click', handleAddPlayer);
             ui.removePlayerBtn.addEventListener('click', handleRemovePlayer);
             
+            // New: Independent Game Creation
+            ui.createNewGameBtn.addEventListener('click', handleCreateNewGameFromSettings);
+            
             // Score input validation
             ui.playerInputs.addEventListener('input', (e) => {
                 if (e.target.classList.contains('score-input')) {
@@ -597,6 +1249,26 @@
             } else {
                 setStatus('گیم میں کم از کم 2 کھلاڑی ہونے چاہئیں!', true);
             }
+        };
+
+        // Handle new game creation from settings
+        const handleCreateNewGameFromSettings = async () => {
+            const customPlayerInputs = document.querySelectorAll('.new-player-input');
+            const customPlayerNames = Array.from(customPlayerInputs).map(input => input.value.trim()).filter(name => name);
+            
+            if (customPlayerNames.length < 2) {
+                setStatus('کم از کم 2 کھلاڑیوں کے نام درج کریں', true);
+                return;
+            }
+
+            ui.settingsModal.classList.add('hidden');
+            
+            // Create new independent game
+            await createIndependentGame(customPlayerNames);
+            await saveGameState();
+            renderGameUI();
+            
+            setStatus('علیحدہ نئی گیم شروع ہو گئی! یہ گیم موجودہ گیم سے الگ ڈیٹا بیس میں محفوظ ہوگی۔');
         };
         
         // ==================== GAME LOGIC ====================
@@ -1012,6 +1684,14 @@
                            value="${player.name}">
                 </div>
             `).join('');
+
+            // Render new player name inputs for independent game
+            ui.newPlayerNameInputs.innerHTML = gameState.players.map((player, index) => `
+                <input type="text" 
+                       class="new-player-input w-full p-2 border border-slate-300 rounded-lg mb-2 text-center urdu-font-normal" 
+                       value="${player.name}" 
+                       placeholder="کھلاڑی ${index + 1}">
+            `).join('');
         };
 
         const handleSaveSettings = async () => {
@@ -1308,6 +1988,8 @@
         // ==================== INITIALIZE APP ====================
         const init = async () => {
             initializeEventListeners();
+            initializeStatsModal();
+            initializeGameLockSystem();
             
             try {
                 ui.loadingText.textContent = 'سسٹم شروع ہو رہا ہے...';
@@ -1315,23 +1997,38 @@
                 const authSuccess = await initializeAuth();
                 
                 if (authSuccess) {
-                    await loadGameState();
+                    // Check for active sessions before loading game state
+                    const hasActiveSession = await checkSessionOnStartup();
                     
-                    if (isOnline) {
-                        startRealtimeListener();
-                        setStatus('Supabase سے کامیابی سے جڑ گیا! تمام ڈیوائسز سینک ہوں گی۔', false);
-                    } else {
-                        setStatus('مقامی موڈ: ڈیٹا صرف اس ڈیوائس پر محفوظ ہوگا', false);
+                    if (!hasActiveSession) {
+                        await loadGameState();
+                        
+                        if (isOnline) {
+                            startRealtimeListener();
+                            setStatus('Supabase سے کامیابی سے جڑ گیا! تمام ڈیوائسز سینک ہوں گی۔', false);
+                        } else {
+                            setStatus('مقامی موڈ: ڈیٹا صرف اس ڈیوائس پر محفوظ ہوگا', false);
+                        }
+                        
+                        renderGameUI();
+                        fetchAndRenderRecords();
+                        
+                        // Start session updates if we're the active session
+                        setInterval(updateGameSession, 30000); // Update every 30 seconds
                     }
-                    
-                    renderGameUI();
-                    fetchAndRenderRecords();
                 } else {
                     // Local mode
-                    await loadGameState();
-                    renderGameUI();
-                    fetchAndRenderRecords();
-                    setStatus('مقامی موڈ میں کام جاری ہے', false);
+                    const hasActiveSession = await checkSessionOnStartup();
+                    
+                    if (!hasActiveSession) {
+                        await loadGameState();
+                        renderGameUI();
+                        fetchAndRenderRecords();
+                        setStatus('مقامی موڈ میں کام جاری ہے', false);
+                        
+                        // Start session updates
+                        setInterval(updateGameSession, 30000);
+                    }
                 }
                 
             } catch (error) {
@@ -1350,4 +2047,3 @@
     </script>
 </body>
 </html>
-
