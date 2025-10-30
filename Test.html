@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+  <meta charset="UTF-8">
+  <title>Supabase Connection Test</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body style="font-family:sans-serif;direction:rtl;text-align:center;margin-top:40px;">
+  <h2>🔗 Supabase کنکشن ٹیسٹ</h2>
+  <div id="output">ٹیسٹ ہو رہا ہے...</div>
+
+  <script>
+    const SUPABASE_URL = "https://gwrlnukpeeiykpxnlmsd.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3cmxudWtwZWVpeWtweG5sbXNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwNzQyMDUsImV4cCI6MjA3NjY1MDIwNX0.WQJxd8KqwSCvE62ypdBRdHArl9UZfE4zUXlZRNnnDxc";
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    (async () => {
+      try {
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error) throw error;
+        document.getElementById('output').innerHTML = "✅ کنکشن کامیاب!<br>یوزر ID: " + data.user.id;
+        console.log("Connected user:", data.user);
+      } catch (err) {
+        document.getElementById('output').innerHTML = "❌ ایرر: " + err.message;
+        console.error("Error:", err);
+      }
+    })();
+  </script>
+</body>
+</html>
