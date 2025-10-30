@@ -145,6 +145,31 @@
             50% { opacity: 0.8; }
             100% { opacity: 1; }
         }
+
+        /* Delete Record Button Styles */
+        .delete-record-btn {
+            position: absolute;
+            left: 1rem;
+            top: 1rem;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            font-size: 0.875rem;
+        }
+        .record-item:hover .delete-record-btn {
+            opacity: 1;
+        }
+        .delete-record-btn:hover {
+            background: #dc2626;
+        }
+        .record-item {
+            position: relative;
+        }
     </style>
 </head>
 <body class="text-slate-800">
@@ -1185,7 +1210,7 @@
             // New: Independent Game Creation
             ui.createNewGameBtn.addEventListener('click', handleCreateNewGameFromSettings);
             
-            // Score input validation
+            // Score input validation - FIXED: removed dot from classList.contains
             ui.playerInputs.addEventListener('input', (e) => {
                 if (e.target.classList.contains('score-input')) {
                     validateScoreInputs();
@@ -1277,20 +1302,34 @@
             let zeroCount = 0;
             let hasNegative = false;
             let allEmpty = true;
+            let hasNonNumeric = false;
             
             inputs.forEach(input => {
-                const value = parseInt(input.value) || 0;
-                if (value === 0) zeroCount++;
-                if (value < 0) hasNegative = true;
-                if (input.value !== '') allEmpty = false;
+                const value = input.value.trim();
+                const numValue = parseInt(value) || 0;
+                
+                if (value !== '') allEmpty = false;
+                if (numValue === 0) zeroCount++;
+                if (numValue < 0) hasNegative = true;
+                if (value !== '' && isNaN(numValue)) hasNonNumeric = true;
             });
             
-            const isValid = !allEmpty && !hasNegative && zeroCount === 1;
-            ui.saveScoreBtn.disabled = !isValid || gameState.isGameOver;
+            const isValid = !allEmpty && !hasNegative && !hasNonNumeric && zeroCount === 1;
+            ui.saveScoreBtn.disabled = !isValid || gameState.isGameOver || isSaving;
             
-            if (!allEmpty && (!isValid || hasNegative)) {
-                ui.scoreError.classList.remove('hidden');
-                ui.scoreError.textContent = 'غلطی: صرف ایک کھلاڑی کا سکور 0 ہونا چاہیے، باقی مثبت۔';
+            if (!allEmpty) {
+                if (hasNegative) {
+                    ui.scoreError.textContent = 'غلطی: سکور منفی نہیں ہو سکتے';
+                    ui.scoreError.classList.remove('hidden');
+                } else if (hasNonNumeric) {
+                    ui.scoreError.textContent = 'غلطی: صرف نمبر درج کریں';
+                    ui.scoreError.classList.remove('hidden');
+                } else if (zeroCount !== 1) {
+                    ui.scoreError.textContent = 'غلطی: صرف ایک کھلاڑی کا سکور 0 ہونا چاہیے';
+                    ui.scoreError.classList.remove('hidden');
+                } else {
+                    ui.scoreError.classList.add('hidden');
+                }
             } else {
                 ui.scoreError.classList.add('hidden');
             }
@@ -1299,18 +1338,21 @@
         };
 
         const handleSaveScore = async () => {
-            if (isSaving || gameState.isGameOver) return;
+            if (isSaving || gameState.isGameOver) {
+                console.log('Saving blocked: isSaving=', isSaving, 'isGameOver=', gameState.isGameOver);
+                return;
+            }
             
             const inputs = document.querySelectorAll('.score-input');
             const roundScores = [];
             
             // Get scores from inputs
-            gameState.players.forEach(() => {
-                const input = inputs[roundScores.length];
+            inputs.forEach(input => {
                 const score = parseInt(input.value) || 0;
                 roundScores.push(score);
             });
             
+            // Final validation
             if (!validateScoreInputs()) {
                 setStatus('براہ کرم درست سکور درج کریں۔', true);
                 return;
@@ -1326,23 +1368,27 @@
                 const roundType = getRoundType(nextRoundNumber);
                 const multiplier = getRoundMultiplier(roundType);
                 
+                console.log('Saving round:', { nextRoundNumber, roundType, multiplier, roundScores });
+                
                 const round = {
                     timestamp: new Date(),
-                    scores: roundScores,
+                    scores: [...roundScores],
                     roundType: roundType,
                     multiplier: multiplier,
                     actualScores: roundScores.map(score => score * multiplier)
                 };
                 
-                // Update game state immediately
+                // Update game state
                 roundScores.forEach((score, index) => {
-                    gameState.players[index].score += score * multiplier;
+                    if (gameState.players[index]) {
+                        gameState.players[index].score += score * multiplier;
+                    }
                 });
                 
                 gameState.history.unshift(round);
                 checkGameOver();
                 
-                // Clear inputs immediately
+                // Clear inputs
                 inputs.forEach(input => input.value = '');
                 
                 // Update UI immediately
@@ -1351,17 +1397,19 @@
                 // Save to database
                 const saved = await saveGameState();
                 if (saved) {
-                    setStatus(`راؤنڈ کا سکور کامیابی سے محفوظ ہو گیا! (${getRoundTypeDisplay(roundType)})`);
+                    setStatus(`راؤنڈ ${nextRoundNumber} کا سکور کامیابی سے محفوظ ہو گیا! (${getRoundTypeDisplay(roundType)})`);
+                } else {
+                    setStatus('سکور محفوظ کرنے میں مسئلہ آیا', true);
                 }
                 
             } catch (error) {
                 console.error('Error saving score:', error);
-                setStatus('سکور محفوظ کرنے میں ناکامی', true);
+                setStatus('سکور محفوظ کرنے میں ناکامی: ' + error.message, true);
             } finally {
                 isSaving = false;
                 ui.saveText.textContent = 'سکور کلاؤڈ میں محفوظ کریں';
                 ui.saveSpinner.classList.add('hidden');
-                validateScoreInputs();
+                validateScoreInputs(); // Re-validate to update button state
             }
         };
 
@@ -1468,6 +1516,56 @@
             }
         };
 
+        // Delete record function
+        const deleteRecord = async (recordId, recordElement) => {
+            if (!confirm('کیا آپ واقعی یہ ریکارڈ شدہ گیم حذف کرنا چاہتے ہیں؟ یہ عمل واپس نہیں ہو سکتا۔')) {
+                return;
+            }
+
+            try {
+                // Show loading state
+                recordElement.style.opacity = '0.5';
+                
+                if (isOnline && !recordId.startsWith('local_')) {
+                    // Delete from Supabase
+                    const { error } = await supabase
+                        .from('rummy_records')
+                        .delete()
+                        .eq('id', recordId);
+                    
+                    if (error) throw error;
+                    
+                    console.log('✅ Record deleted from Supabase');
+                } else {
+                    // Delete from localStorage
+                    const existingRecords = JSON.parse(localStorage.getItem('rummy_records') || '[]');
+                    const updatedRecords = existingRecords.filter(record => 
+                        record.id !== recordId && 
+                        !(recordId.startsWith('local_') && record.id === recordId)
+                    );
+                    localStorage.setItem('rummy_records', JSON.stringify(updatedRecords));
+                    console.log('✅ Record deleted from localStorage');
+                }
+                
+                // Remove from UI
+                recordElement.remove();
+                
+                // Check if any records left
+                const remainingRecords = document.querySelectorAll('.record-item');
+                if (remainingRecords.length === 0) {
+                    ui.recordsList.innerHTML = '<p class="text-center text-slate-500 urdu-font-normal">ابھی تک کوئی ریکارڈ شدہ گیم نہیں ہے۔</p>';
+                }
+                
+                setStatus('ریکارڈ شدہ گیم کامیابی سے حذف ہو گئی!');
+                
+            } catch (error) {
+                console.error('Error deleting record:', error);
+                setStatus('ریکارڈ حذف کرنے میں ناکامی', true);
+                // Reset opacity
+                recordElement.style.opacity = '1';
+            }
+        };
+
         const fetchAndRenderRecords = async (showRefresh = false) => {
             try {
                 if (showRefresh) {
@@ -1569,11 +1667,18 @@
                            class="score-input flex-1 p-3 border border-slate-300 rounded-lg urdu-font-bold text-lg" 
                            placeholder="0" 
                            min="0"
+                           value=""
                            ${gameState.isGameOver ? 'disabled' : ''}>
                 </div>
             `).join('');
             
-            validateScoreInputs();
+            // Add event listeners to new inputs
+            const newInputs = ui.playerInputs.querySelectorAll('.score-input');
+            newInputs.forEach(input => {
+                input.addEventListener('input', () => validateScoreInputs());
+            });
+            
+            validateScoreInputs(); // Initial validation
         };
 
         const renderHistory = () => {
@@ -1878,7 +1983,11 @@
                 const recordGridClass = getPlayerGridClass(players.length); // Use the utility function
                 
                 return `
-                    <div class="p-4 border border-slate-200 rounded-lg mb-3 hover:bg-slate-50 transition-colors cursor-pointer record-item" data-record-id="${record.id || 'local'}">
+                    <div class="record-item p-4 border border-slate-200 rounded-lg mb-3 hover:bg-slate-50 transition-colors cursor-pointer" data-record-id="${record.id || 'local'}">
+                        <button class="delete-record-btn urdu-font-normal" data-record-id="${record.id || 'local'}">
+                            🗑️ حذف کریں
+                        </button>
+                        
                         <div class="flex justify-between items-start mb-2">
                             <div>
                                 <h3 class="urdu-font-bold text-slate-800">${timestamp.toLocaleDateString('ur-PK')}</h3>
@@ -1906,14 +2015,29 @@
                 `;
             }).join('');
             
+            // Add event listeners for record items and delete buttons
             document.querySelectorAll('.record-item').forEach(item => {
                 item.addEventListener('click', (e) => {
+                    // Don't trigger if delete button was clicked
+                    if (e.target.classList.contains('delete-record-btn') || e.target.closest('.delete-record-btn')) {
+                        return;
+                    }
                     const recordId = e.currentTarget.dataset.recordId;
                     // Find record in the combined array
                     const record = records.find(r => (r.id === recordId) || (r.id === 'local_' + recordId.split('_')[1] && recordId.startsWith('local_')));
                     if (record) {
                         showRecordDetails(record);
                     }
+                });
+            });
+            
+            // Add event listeners for delete buttons
+            document.querySelectorAll('.delete-record-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent triggering the record item click
+                    const recordId = e.currentTarget.dataset.recordId;
+                    const recordElement = e.currentTarget.closest('.record-item');
+                    deleteRecord(recordId, recordElement);
                 });
             });
         };
