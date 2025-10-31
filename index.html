@@ -170,10 +170,100 @@
         .record-item {
             position: relative;
         }
+
+        /* Login Modal Styles */
+        .login-modal {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            text-align: center;
+            max-width: 400px;
+            margin: 1rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .login-tabs {
+            display: flex;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .login-tab {
+            flex: 1;
+            padding: 0.75rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-family: 'Noto Nastaliq Urdu', serif;
+            font-weight: 700;
+            transition: all 0.3s ease;
+        }
+        .login-tab.active {
+            color: #06b6d4;
+            border-bottom: 3px solid #06b6d4;
+        }
+        .user-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            margin-left: 1rem;
+        }
+        .admin-badge {
+            background: #06b6d4;
+            color: white;
+        }
+        .user-badge-style {
+            background: #10b981;
+            color: white;
+        }
     </style>
 </head>
 <body class="text-slate-800">
-    <div id="app" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+    <!-- Login Modal -->
+    <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+        <div class="login-modal">
+            <div class="text-4xl mb-4">🔐</div>
+            <h2 class="text-2xl urdu-font-bold mb-6 text-slate-800">رمی ڈیش بورڈ میں خوش آمدید</h2>
+            
+            <div class="login-tabs">
+                <button id="user-tab" class="login-tab active urdu-font-bold">یوزر لوگ ان</button>
+                <button id="admin-tab" class="login-tab urdu-font-bold">ایڈمن لوگ ان</button>
+            </div>
+            
+            <div id="user-login-form" class="login-form">
+                <div class="space-y-4">
+                    <div>
+                        <label for="user-password" class="block text-sm urdu-font-normal text-slate-600 mb-1 text-right">یوزر پاسورڈ</label>
+                        <input type="password" id="user-password" class="w-full p-3 border border-slate-300 rounded-lg text-center urdu-font-normal" placeholder="پاسورڈ درج کریں">
+                    </div>
+                    <button id="user-login-btn" class="w-full bg-green-600 text-white urdu-font-bold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors duration-200">
+                        یوزر لوگ ان
+                    </button>
+                </div>
+            </div>
+            
+            <div id="admin-login-form" class="login-form hidden">
+                <div class="space-y-4">
+                    <div>
+                        <label for="admin-password" class="block text-sm urdu-font-normal text-slate-600 mb-1 text-right">ایڈمن پاسورڈ</label>
+                        <input type="password" id="admin-password" class="w-full p-3 border border-slate-300 rounded-lg text-center urdu-font-normal" placeholder="پاسورڈ درج کریں">
+                    </div>
+                    <button id="admin-login-btn" class="w-full bg-cyan-600 text-white urdu-font-bold py-3 px-4 rounded-lg hover:bg-cyan-700 transition-colors duration-200">
+                        ایڈمن لوگ ان
+                    </button>
+                </div>
+            </div>
+            
+            <div class="mt-4 text-center">
+                <p class="text-xs text-slate-500 urdu-font-normal">
+                    یوزر: سکور درج کر سکتا ہے • ایڈمن: مکمل کنٹرول
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="app" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 hidden">
         <!-- Loading Indicator -->
         <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50 transition-opacity duration-500">
             <div class="flex flex-col items-center">
@@ -185,7 +275,13 @@
 
         <header class="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
             <div>
-                <h1 class="text-3xl md:text-4xl urdu-font-bold text-slate-900">رمی ڈیش بورڈ 🌐</h1>
+                <div class="flex items-center gap-3">
+                    <h1 class="text-3xl md:text-4xl urdu-font-bold text-slate-900">رمی ڈیش بورڈ 🌐</h1>
+                    <span id="user-role-badge" class="user-badge urdu-font-normal"></span>
+                    <button id="logout-btn" class="text-sm urdu-font-normal text-slate-500 hover:text-slate-700 transition-colors">
+                        (لوگ آؤٹ)
+                    </button>
+                </div>
                 <div class="flex items-center gap-2 mt-1">
                     <p id="user-info" class="text-xs text-slate-400 urdu-font-normal">کلاؤڈ آئی ڈی:</p>
                     <span id="user-id-display" class="text-sm text-cyan-600 urdu-font-bold">...</span>
@@ -202,7 +298,14 @@
                     </svg>
                 </button>
                 <button id="settings-btn" aria-label="ترتیبات" class="p-3 rounded-full hover:bg-slate-200 transition-colors duration-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-600"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-600"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h-.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                </button>
+                <!-- نیا پاسورڈ بٹن صرف ایڈمن کے لیے -->
+                <button id="password-btn" class="p-3 rounded-full hover:bg-slate-200 transition-colors duration-200 hidden" aria-label="پاسورڈ تبدیل کریں">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-600">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
                 </button>
             </div>
         </header>
@@ -288,7 +391,7 @@
     <!-- Settings Modal (Updated for dynamic player management) -->
     <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-md">
-            <h2 class="text-2xl urdu-font-bold mb-6 text-center">ترتیبات</h2>
+            <h2 class="text-2xl urdu-font-bold mb-6 text-center">گیم ترتیبات</h2>
             <div class="space-y-4">
                 <div>
                     <label for="game-limit-input" class="block text-sm urdu-font-normal text-slate-600 mb-1">گیم کی حد (لوزر سکور)</label>
@@ -339,6 +442,31 @@
             <div class="mt-8 flex justify-end gap-4">
                 <button id="cancel-settings-btn" class="px-4 py-2 bg-slate-200 text-slate-800 urdu-font-normal rounded-lg hover:bg-slate-300 transition-colors">منسوخ</button>
                 <button id="save-settings-btn" class="px-4 py-2 bg-cyan-600 text-white urdu-font-bold rounded-lg hover:bg-cyan-700 transition-colors">کلاؤڈ میں محفوظ کریں</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Change Modal (Only for Admin) -->
+    <div id="password-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-md">
+            <h2 class="text-2xl urdu-font-bold mb-6 text-center">پاسورڈ مینجمنٹ</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label for="admin-password-change" class="block text-sm urdu-font-normal text-slate-600 mb-1">نیا ایڈمن پاسورڈ</label>
+                    <input type="password" id="admin-password-change" class="w-full p-2 border border-slate-300 rounded-lg text-center urdu-font-normal" placeholder="نیا ایڈمن پاسورڈ">
+                </div>
+                <div>
+                    <label for="user-password-change" class="block text-sm urdu-font-normal text-slate-600 mb-1">نیا یوزر پاسورڈ</label>
+                    <input type="password" id="user-password-change" class="w-full p-2 border border-slate-300 rounded-lg text-center urdu-font-normal" placeholder="نیا یوزر پاسورڈ">
+                </div>
+                <button id="change-passwords-btn" class="w-full bg-blue-600 text-white urdu-font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200">
+                    پاسورڈز تبدیل کریں
+                </button>
+            </div>
+            
+            <div class="mt-8 flex justify-end">
+                <button id="cancel-password-btn" class="px-4 py-2 bg-slate-200 text-slate-800 urdu-font-normal rounded-lg hover:bg-slate-300 transition-colors">منسوخ</button>
             </div>
         </div>
     </div>
@@ -398,6 +526,15 @@
     </div>
 
     <script>
+        // ==================== LOGIN SYSTEM ====================
+        const DEFAULT_PASSWORDS = {
+            admin: 'admin123',
+            user: 'user123'
+        };
+
+        let currentUser = null;
+        let passwords = { ...DEFAULT_PASSWORDS };
+
         // ==================== SUPABASE CONFIGURATION ====================
         const SUPABASE_URL = 'https://gwrlnukpeeiykpxnlmsd.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3cmxudWtwZWVpeWtweG5sbXNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwNzQyMDUsImV4cCI6MjA3NjY1MDIwNX0.WQJxd8KqwSCvE62ypdBRdHArl9UZfE4zUXlZRNnnDxc';
@@ -406,7 +543,6 @@
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // ==================== DEFAULT STATE ====================
-        // The default state now supports dynamic player count.
         const DEFAULT_GAME_STATE = {
             players: [
                 { id: 'p1', name: 'معظم', score: 0 },
@@ -433,6 +569,21 @@
 
         // ==================== UI ELEMENTS ====================
         const ui = {
+            // Login UI
+            loginModal: document.getElementById('login-modal'),
+            userTab: document.getElementById('user-tab'),
+            adminTab: document.getElementById('admin-tab'),
+            userLoginForm: document.getElementById('user-login-form'),
+            adminLoginForm: document.getElementById('admin-login-form'),
+            userPassword: document.getElementById('user-password'),
+            adminPassword: document.getElementById('admin-password'),
+            userLoginBtn: document.getElementById('user-login-btn'),
+            adminLoginBtn: document.getElementById('admin-login-btn'),
+            logoutBtn: document.getElementById('logout-btn'),
+            userRoleBadge: document.getElementById('user-role-badge'),
+            
+            // Main App UI
+            app: document.getElementById('app'),
             loadingOverlay: document.getElementById('loading-overlay'),
             loadingText: document.getElementById('loading-text'),
             authStatus: document.getElementById('auth-status'),
@@ -454,11 +605,14 @@
             historyList: document.getElementById('history-list'),
             noHistoryMsg: document.getElementById('no-history-msg'),
             settingsBtn: document.getElementById('settings-btn'),
+            passwordBtn: document.getElementById('password-btn'), // نیا پاسورڈ بٹن
             settingsModal: document.getElementById('settings-modal'),
+            passwordModal: document.getElementById('password-modal'), // نیا پاسورڈ مودل
             gameLimitInput: document.getElementById('game-limit-input'),
             playerNameInputs: document.getElementById('player-name-inputs'),
             cancelSettingsBtn: document.getElementById('cancel-settings-btn'),
             saveSettingsBtn: document.getElementById('save-settings-btn'),
+            cancelPasswordBtn: document.getElementById('cancel-password-btn'),
             chartCanvas: document.getElementById('score-chart'),
             recordsList: document.getElementById('records-list'),
             refreshRecordsBtn: document.getElementById('refresh-records-btn'),
@@ -467,6 +621,12 @@
             closeRecordDetailsBtn: document.getElementById('close-record-details-btn'),
             roundTypeIndicator: document.getElementById('round-type-indicator'),
             syncStatus: document.getElementById('sync-status'),
+            
+            // Password Management UI
+            adminPasswordChange: document.getElementById('admin-password-change'),
+            userPasswordChange: document.getElementById('user-password-change'),
+            changePasswordsBtn: document.getElementById('change-passwords-btn'),
+            
             // New UI elements for dynamic player count management
             addPlayerBtn: document.getElementById('add-player-btn'), 
             removePlayerBtn: document.getElementById('remove-player-btn'), 
@@ -483,11 +643,160 @@
         let scoreChart;
         let isSaving = false;
 
+        // ==================== LOGIN SYSTEM FUNCTIONS ====================
+        const initializeLoginSystem = () => {
+            // Load saved passwords
+            const savedPasswords = localStorage.getItem('rummy_passwords');
+            if (savedPasswords) {
+                passwords = JSON.parse(savedPasswords);
+            }
+
+            // FIX: Clear any existing user session to force login
+            localStorage.removeItem('rummy_current_user');
+            localStorage.removeItem('rummy_auto_login');
+
+            // Login tab switching
+            ui.userTab.addEventListener('click', () => {
+                ui.userTab.classList.add('active');
+                ui.adminTab.classList.remove('active');
+                ui.userLoginForm.classList.remove('hidden');
+                ui.adminLoginForm.classList.add('hidden');
+            });
+
+            ui.adminTab.addEventListener('click', () => {
+                ui.adminTab.classList.add('active');
+                ui.userTab.classList.remove('active');
+                ui.adminLoginForm.classList.remove('hidden');
+                ui.userLoginForm.classList.add('hidden');
+            });
+
+            // Login buttons
+            ui.userLoginBtn.addEventListener('click', handleUserLogin);
+            ui.adminLoginBtn.addEventListener('click', handleAdminLogin);
+
+            // Logout button
+            ui.logoutBtn.addEventListener('click', handleLogout);
+
+            // Enter key support for login
+            ui.userPassword.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleUserLogin();
+            });
+
+            ui.adminPassword.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleAdminLogin();
+            });
+        };
+
+        const handleUserLogin = () => {
+            const password = ui.userPassword.value.trim();
+            if (password === passwords.user) {
+                currentUser = 'user';
+                localStorage.setItem('rummy_current_user', 'user');
+                // Don't enable auto-login by default for security
+                localStorage.setItem('rummy_auto_login', 'false');
+                showMainApp();
+            } else {
+                alert('غلط پاسورڈ! براہ کرم دوبارہ کوشش کریں۔');
+                ui.userPassword.value = '';
+                ui.userPassword.focus();
+            }
+        };
+
+        const handleAdminLogin = () => {
+            const password = ui.adminPassword.value.trim();
+            if (password === passwords.admin) {
+                currentUser = 'admin';
+                localStorage.setItem('rummy_current_user', 'admin');
+                // Don't enable auto-login by default for security
+                localStorage.setItem('rummy_auto_login', 'false');
+                showMainApp();
+            } else {
+                alert('غلط پاسورڈ! براہ کرم دوبارہ کوشش کریں۔');
+                ui.adminPassword.value = '';
+                ui.adminPassword.focus();
+            }
+        };
+
+        const handleLogout = () => {
+            if (confirm('کیا آپ واقعی لوگ آؤٹ کرنا چاہتے ہیں؟')) {
+                currentUser = null;
+                // Clear ALL user data from localStorage
+                localStorage.removeItem('rummy_current_user');
+                localStorage.removeItem('rummy_auto_login');
+                localStorage.removeItem('rummy_current_game');
+                localStorage.removeItem('rummy_active_session');
+                
+                hideMainApp();
+                // Clear password fields
+                ui.userPassword.value = '';
+                ui.adminPassword.value = '';
+                // Switch to user tab
+                ui.userTab.click();
+                
+                alert('آپ کامیابی سے لوگ آؤٹ ہو گئے ہیں۔ دوبارہ استعمال کرنے کے لیے لاگ ان کریں۔');
+            }
+        };
+
+        const showMainApp = () => {
+            ui.loginModal.classList.add('hidden');
+            ui.app.classList.remove('hidden');
+            updateUIForUserRole();
+            initializeApp();
+        };
+
+        const hideMainApp = () => {
+            ui.app.classList.add('hidden');
+            ui.loginModal.classList.remove('hidden');
+        };
+
+        const updateUIForUserRole = () => {
+            // Update user badge
+            if (currentUser === 'admin') {
+                ui.userRoleBadge.textContent = 'ایڈمن';
+                ui.userRoleBadge.className = 'user-badge admin-badge urdu-font-normal';
+                // Show password button for admin only
+                ui.passwordBtn.classList.remove('hidden');
+            } else {
+                ui.userRoleBadge.textContent = 'یوزر';
+                ui.userRoleBadge.className = 'user-badge user-badge-style urdu-font-normal';
+                // Hide password button for user
+                ui.passwordBtn.classList.add('hidden');
+            }
+
+            // FIX: Only hide delete-record-btn for user, not delete-btn for rounds
+            const deleteRecordButtons = document.querySelectorAll('.delete-record-btn');
+            deleteRecordButtons.forEach(btn => {
+                btn.style.display = currentUser === 'admin' ? '' : 'none';
+            });
+        };
+
+        const changePasswords = () => {
+            const newAdminPassword = ui.adminPasswordChange.value.trim();
+            const newUserPassword = ui.userPasswordChange.value.trim();
+
+            if (newAdminPassword && newAdminPassword.length >= 4) {
+                passwords.admin = newAdminPassword;
+            }
+
+            if (newUserPassword && newUserPassword.length >= 4) {
+                passwords.user = newUserPassword;
+            }
+
+            // Save passwords to localStorage
+            localStorage.setItem('rummy_passwords', JSON.stringify(passwords));
+
+            // Clear input fields
+            ui.adminPasswordChange.value = '';
+            ui.userPasswordChange.value = '';
+
+            setStatus('پاسورڈز کامیابی سے تبدیل ہو گئے!');
+            ui.passwordModal.classList.add('hidden');
+        };
+
         // ==================== UTILITY FUNCTIONS ====================
         const formatScore = (score) => score.toLocaleString('ur-PK');
 
         const getRoundType = (roundNumber) => {
-            // Lucky game on round 1, 2, 6, 7, 11, 12 etc. (First two rounds of every 5-round cycle are lucky)
             const cyclePosition = (roundNumber - 1) % 5;
             return cyclePosition < 2 ? 'lucky' : 'normal';
         };
@@ -525,13 +834,10 @@
             if (playerCount === 3) return 'grid-cols-3';
             if (playerCount === 5) return 'grid-cols-5';
             if (playerCount === 6) return 'grid-cols-6';
-            // Default for 4 players or other fallbacks
             return 'grid-cols-2 md:grid-cols-4'; 
         };
 
         // ==================== MULTI-DEVICE GAME LOCK SYSTEM ====================
-
-        // Initialize game lock system
         const initializeGameLockSystem = () => {
             gameLockModal = document.getElementById('game-lock-modal');
             viewGameBtn = document.getElementById('view-game-btn');
@@ -542,14 +848,11 @@
             newGameBtn.addEventListener('click', createNewGameSession);
         };
 
-        // Check if there's an active game session
         const checkActiveGameSession = async () => {
             if (!isOnline) {
-                // In offline mode, use localStorage to check for active game
                 const activeSession = localStorage.getItem('rummy_active_session');
                 if (activeSession) {
                     const sessionData = JSON.parse(activeSession);
-                    // Check if session is still active (last update within 5 minutes)
                     const lastUpdate = new Date(sessionData.lastUpdated);
                     const now = new Date();
                     const minutesDiff = (now - lastUpdate) / (1000 * 60);
@@ -562,7 +865,6 @@
             }
 
             try {
-                // Check for active game sessions in Supabase
                 const { data: activeSessions, error } = await supabase
                     .from('rummy_sessions')
                     .select('*')
@@ -574,7 +876,6 @@
 
                 if (activeSessions && activeSessions.length > 0) {
                     const activeSession = activeSessions[0];
-                    // Check if session belongs to current user or is a shared session
                     if (activeSession.user_id !== userId) {
                         return activeSession;
                     }
@@ -586,7 +887,6 @@
             }
         };
 
-        // Create a new game session
         const createNewGameSession = async () => {
             const sessionId = 'session_' + Date.now();
             
@@ -599,7 +899,6 @@
                 gameLimit: gameState.gameLimit
             };
 
-            // Save to appropriate storage
             if (isOnline) {
                 try {
                     const { data, error } = await supabase
@@ -617,19 +916,16 @@
                     if (error) throw error;
                 } catch (error) {
                     console.error('Error creating session:', error);
-                    // Fallback to localStorage
                     localStorage.setItem('rummy_active_session', JSON.stringify(currentGameSession));
                 }
             } else {
                 localStorage.setItem('rummy_active_session', JSON.stringify(currentGameSession));
             }
 
-            // Close the modal and continue with normal game
             gameLockModal.classList.add('hidden');
             setStatus('نئی گیم شروع ہو گئی! یہ گیم علیحدہ ڈیٹا بیس میں محفوظ ہوگی۔');
         };
 
-        // Enter view-only mode
         const enterViewOnlyMode = () => {
             isViewOnlyMode = true;
             gameLockModal.classList.add('hidden');
@@ -637,9 +933,7 @@
             setStatus('آپ ویو اونلی موڈ میں ہیں۔ گیم دیکھ سکتے ہیں لیکن تبدیلی نہیں کر سکتے۔');
         };
 
-        // Setup view-only mode UI
         const setupViewOnlyMode = () => {
-            // Add view-only banner
             const banner = document.createElement('div');
             banner.className = 'game-lock-banner';
             banner.innerHTML = `
@@ -654,38 +948,31 @@
             
             document.querySelector('main').prepend(banner);
             
-            // Add event listener to exit button
             document.getElementById('exit-view-btn').addEventListener('click', () => {
                 if (confirm('کیا آپ واقعی نئی گیم شروع کرنا چاہتے ہیں؟ موجودہ گیم کی نقل آپ کی ڈیوائس پر محفوظ ہوگی۔')) {
-                    location.reload(); // Reload to start fresh
+                    location.reload();
                 }
             });
 
-            // Disable all interactive elements
             disableInteractiveElements();
         };
 
-        // Disable interactive elements in view-only mode
         const disableInteractiveElements = () => {
-            // Disable score inputs
             const scoreInputs = document.querySelectorAll('.score-input');
             scoreInputs.forEach(input => {
                 input.disabled = true;
                 input.placeholder = 'ویو اونلی';
             });
 
-            // Disable buttons
             ui.saveScoreBtn.disabled = true;
             ui.settingsBtn.disabled = true;
             ui.resetGameBtn.disabled = true;
             ui.recordGameBtn.disabled = true;
 
-            // Change button texts to indicate view-only mode
             ui.saveScoreBtn.textContent = 'ویو اونلی موڈ';
             ui.saveScoreBtn.style.background = '#9ca3af';
         };
 
-        // Update game session periodically
         const updateGameSession = async () => {
             if (!currentGameSession || isViewOnlyMode) return;
 
@@ -710,12 +997,10 @@
             }
         };
 
-        // Check for active session on startup
         const checkSessionOnStartup = async () => {
             const activeSession = await checkActiveGameSession();
             
             if (activeSession && activeSession.user_id !== userId) {
-                // Show game lock modal
                 showGameLockModal(activeSession);
                 return true;
             }
@@ -723,7 +1008,6 @@
             return false;
         };
 
-        // Show game lock modal with session info
         const showGameLockModal = (session) => {
             const playerNames = session.player_names || session.playerNames || ['نامعلوم'];
             const gameLimit = session.game_limit || session.gameLimit || 800;
@@ -735,13 +1019,9 @@
         };
 
         // ==================== MULTIPLE GAMES SUPPORT ====================
-
-        // New function to create independent game
         const createIndependentGame = async (customPlayerNames = null) => {
-            // Generate unique session ID
             const sessionId = 'independent_' + Date.now();
             
-            // Create new game state with custom players or default
             const newGameState = {
                 ...DEFAULT_GAME_STATE,
                 players: customPlayerNames ? 
@@ -755,7 +1035,6 @@
                 isIndependent: true
             };
 
-            // Save to independent storage
             if (isOnline) {
                 try {
                     const { data, error } = await supabase
@@ -773,7 +1052,6 @@
                     console.error('Error creating independent game:', error);
                 }
             } else {
-                // Save to localStorage for independent games
                 const independentGames = JSON.parse(localStorage.getItem('rummy_independent_games') || '[]');
                 independentGames.unshift({
                     id: sessionId,
@@ -785,7 +1063,6 @@
                 localStorage.setItem('rummy_independent_games', JSON.stringify(independentGames));
             }
 
-            // Update current game state
             gameState = newGameState;
             currentGameSession = {
                 id: sessionId,
@@ -799,8 +1076,6 @@
         };
 
         // ==================== STATISTICS SYSTEM ====================
-
-        // Initialize statistics modal
         const initializeStatsModal = () => {
             ui.statsBtn.addEventListener('click', showGameStatistics);
             ui.closeStatsBtn.addEventListener('click', () => {
@@ -808,7 +1083,6 @@
             });
         };
 
-        // Show game statistics
         const showGameStatistics = () => {
             if (gameState.history.length === 0) {
                 ui.statsContent.innerHTML = `
@@ -826,7 +1100,6 @@
             ui.statsModal.classList.remove('hidden');
         };
 
-        // Calculate comprehensive game statistics
         const calculateGameStatistics = () => {
             const stats = {
                 totalRounds: gameState.history.length,
@@ -838,7 +1111,6 @@
                 averageScores: {}
             };
 
-            // Calculate round types
             gameState.history.forEach(round => {
                 stats.totalScore += round.actualScores.reduce((a, b) => a + b, 0);
                 if (round.roundType === 'lucky') {
@@ -848,7 +1120,6 @@
                 }
             });
 
-            // Calculate player-specific statistics
             stats.playerStats = gameState.players.map((player, index) => {
                 const playerRounds = gameState.history.map(round => ({
                     score: round.scores[index],
@@ -875,7 +1146,6 @@
                 };
             });
 
-            // Calculate overall averages
             stats.averageScores = {
                 perRound: stats.totalScore / stats.totalRounds,
                 perPlayer: stats.totalScore / (stats.totalRounds * gameState.players.length)
@@ -884,7 +1154,6 @@
             return stats;
         };
 
-        // Calculate game duration
         const calculateGameDuration = () => {
             if (gameState.history.length === 0) return 'N/A';
             
@@ -898,7 +1167,6 @@
             return hours > 0 ? `${hours} گھنٹے ${minutes} منٹ` : `${minutes} منٹ`;
         };
 
-        // Render statistics
         const renderStatistics = (stats) => {
             const highestScorer = [...stats.playerStats].sort((a, b) => b.currentScore - a.currentScore)[0];
             const mostZeros = [...stats.playerStats].sort((a, b) => b.zeroRounds - a.zeroRounds)[0];
@@ -1000,7 +1268,6 @@
             try {
                 ui.loadingText.textContent = 'Supabase کنکشن ٹیسٹ ہو رہا ہے...';
                 
-                // Test authentication
                 const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
                 if (authError) {
                     console.error('Authentication failed:', authError);
@@ -1009,7 +1276,6 @@
                 
                 console.log('✅ Authentication successful');
                 
-                // Get the current session
                 const { data: { session } } = await supabase.auth.getSession();
                 userId = session.user.id;
                 
@@ -1022,11 +1288,9 @@
             } catch (error) {
                 console.error('❌ Supabase initialization failed:', error);
                 
-                // Fallback to localStorage
                 setStatus('Supabase کنکشن ناکام، مقامی موڈ میں کام جاری ہے', true);
                 updateSyncStatus(false);
                 
-                // Generate local user ID
                 userId = localStorage.getItem('rummy_user_id') || 'local_' + Date.now();
                 localStorage.setItem('rummy_user_id', userId);
                 ui.userIdDisplay.textContent = userId.substring(0, 8) + '... (مقامی)';
@@ -1043,7 +1307,6 @@
             };
 
             if (!isOnline) {
-                // Save to localStorage
                 try {
                     localStorage.setItem('rummy_current_game', JSON.stringify(stateToSave));
                     console.log('✅ Saved to localStorage');
@@ -1067,7 +1330,6 @@
 
                 if (error) {
                     console.error('❌ Supabase save error:', error);
-                    // Fallback to localStorage
                     localStorage.setItem('rummy_current_game', JSON.stringify(stateToSave));
                     return true;
                 }
@@ -1082,7 +1344,6 @@
         };
 
         const loadGameState = async () => {
-            // First try Supabase
             if (isOnline) {
                 try {
                     const { data, error } = await supabase
@@ -1098,7 +1359,6 @@
                             history: data.game_data.history || [],
                             players: data.game_data.players || DEFAULT_GAME_STATE.players
                         };
-                        // Ensure IDs are sequential after loading (important for consistency)
                         gameState.players = gameState.players.map((p, i) => ({
                             ...p,
                             id: 'p' + (i + 1)
@@ -1111,7 +1371,6 @@
                 }
             }
 
-            // Fallback to localStorage
             try {
                 const saved = localStorage.getItem('rummy_current_game');
                 if (saved) {
@@ -1122,7 +1381,6 @@
                         history: data.history || [],
                         players: data.players || DEFAULT_GAME_STATE.players
                     };
-                    // Ensure IDs are sequential after loading (important for consistency)
                     gameState.players = gameState.players.map((p, i) => ({
                         ...p,
                         id: 'p' + (i + 1)
@@ -1164,7 +1422,6 @@
                                     history: payload.new.game_data.history || [],
                                     players: payload.new.game_data.players || DEFAULT_GAME_STATE.players
                                 };
-                                // Re-assign IDs to ensure consistency after load
                                 gameState.players = gameState.players.map((p, i) => ({
                                     ...p,
                                     id: 'p' + (i + 1)
@@ -1195,13 +1452,22 @@
                 ui.settingsModal.classList.remove('hidden');
                 renderSettingsModal();
             });
+            ui.passwordBtn.addEventListener('click', () => {
+                ui.passwordModal.classList.remove('hidden');
+            });
             ui.cancelSettingsBtn.addEventListener('click', () => {
                 ui.settingsModal.classList.add('hidden');
+            });
+            ui.cancelPasswordBtn.addEventListener('click', () => {
+                ui.passwordModal.classList.add('hidden');
             });
             ui.saveSettingsBtn.addEventListener('click', handleSaveSettings);
             ui.closeRecordDetailsBtn.addEventListener('click', () => {
                 ui.recordDetailsModal.classList.add('hidden');
             });
+
+            // Password change
+            ui.changePasswordsBtn.addEventListener('click', changePasswords);
 
             // New: Dynamic Player Management Listeners
             ui.addPlayerBtn.addEventListener('click', handleAddPlayer);
@@ -1210,7 +1476,7 @@
             // New: Independent Game Creation
             ui.createNewGameBtn.addEventListener('click', handleCreateNewGameFromSettings);
             
-            // Score input validation - FIXED: removed dot from classList.contains
+            // Score input validation
             ui.playerInputs.addEventListener('input', (e) => {
                 if (e.target.classList.contains('score-input')) {
                     validateScoreInputs();
@@ -1231,11 +1497,8 @@
         };
 
         // ==================== DYNAMIC PLAYER MANAGEMENT ====================
-
         const updatePlayerCountButtons = () => {
-            // زیادہ سے زیادہ 6 کھلاڑی
             ui.addPlayerBtn.disabled = gameState.players.length >= 6; 
-            // کم از کم 2 کھلاڑی
             ui.removePlayerBtn.disabled = gameState.players.length <= 2; 
         };
 
@@ -1258,12 +1521,10 @@
             if (gameState.players.length > 2) {
                 const removedPlayer = gameState.players.pop();
                 
-                // IDs and names are fine, but the history data will become inconsistent if game is running.
                 if (gameState.history.length > 0) {
                      setStatus(`خبردار: ${removedPlayer.name} کو ہٹانے سے موجودہ سکور اور تاریخ میں خلل پڑ سکتا ہے۔ نیا گیم شروع کرنا بہتر ہے۔`, true);
                 }
                 
-                // Re-index IDs
                 gameState.players = gameState.players.map((p, i) => ({
                     ...p,
                     id: 'p' + (i + 1)
@@ -1288,7 +1549,6 @@
 
             ui.settingsModal.classList.add('hidden');
             
-            // Create new independent game
             await createIndependentGame(customPlayerNames);
             await saveGameState();
             renderGameUI();
@@ -1315,6 +1575,7 @@
             });
             
             const isValid = !allEmpty && !hasNegative && !hasNonNumeric && zeroCount === 1;
+            // Both user and admin can save scores now
             ui.saveScoreBtn.disabled = !isValid || gameState.isGameOver || isSaving;
             
             if (!allEmpty) {
@@ -1346,13 +1607,11 @@
             const inputs = document.querySelectorAll('.score-input');
             const roundScores = [];
             
-            // Get scores from inputs
             inputs.forEach(input => {
                 const score = parseInt(input.value) || 0;
                 roundScores.push(score);
             });
             
-            // Final validation
             if (!validateScoreInputs()) {
                 setStatus('براہ کرم درست سکور درج کریں۔', true);
                 return;
@@ -1378,7 +1637,6 @@
                     actualScores: roundScores.map(score => score * multiplier)
                 };
                 
-                // Update game state
                 roundScores.forEach((score, index) => {
                     if (gameState.players[index]) {
                         gameState.players[index].score += score * multiplier;
@@ -1388,13 +1646,10 @@
                 gameState.history.unshift(round);
                 checkGameOver();
                 
-                // Clear inputs
                 inputs.forEach(input => input.value = '');
                 
-                // Update UI immediately
                 renderGameUI();
                 
-                // Save to database
                 const saved = await saveGameState();
                 if (saved) {
                     setStatus(`راؤنڈ ${nextRoundNumber} کا سکور کامیابی سے محفوظ ہو گیا! (${getRoundTypeDisplay(roundType)})`);
@@ -1409,7 +1664,7 @@
                 isSaving = false;
                 ui.saveText.textContent = 'سکور کلاؤڈ میں محفوظ کریں';
                 ui.saveSpinner.classList.add('hidden');
-                validateScoreInputs(); // Re-validate to update button state
+                validateScoreInputs();
             }
         };
 
@@ -1423,7 +1678,6 @@
                 const actualLoser = losers.reduce((max, player) => 
                     player.score > max.score ? player : max, losers[0]
                 );
-                // Find the index of the loser in the current players array
                 const loserIndex = gameState.players.findIndex(p => p.id === actualLoser.id);
                 if (gameState.history.length > 0) {
                     gameState.history[0].loserIndex = loserIndex;
@@ -1439,15 +1693,15 @@
             const playerNames = gameState.players.map(p => p.name);
             gameState = {
                 ...DEFAULT_GAME_STATE,
-                players: gameState.players.map((p, i) => ({ // Use current players for reset
+                players: gameState.players.map((p, i) => ({
                     ...p,
                     name: playerNames[i] || p.name,
-                    score: 0 // Reset score to 0
+                    score: 0
                 })),
                 gameLimit: gameState.gameLimit,
-                history: [], // Clear history
-                isGameOver: false, // Reset game over status
-                isRecorded: false // Reset recorded status
+                history: [],
+                isGameOver: false,
+                isRecorded: false
             };
             
             await saveGameState();
@@ -1457,6 +1711,7 @@
 
         // ==================== RECORDS MANAGEMENT ====================
         const handleRecordGame = async () => {
+            // FIX: Allow both user and admin to record games (not just admin)
             if (!gameState.isGameOver || gameState.isRecorded) return;
 
             ui.recordGameBtn.disabled = true;
@@ -1473,7 +1728,7 @@
                     history: gameState.history,
                     final_scores: gameState.players.map(p => p.score),
                     user_id: userId,
-                    user_name: 'Anonymous User'
+                    user_name: currentUser === 'admin' ? 'ایڈمن' : 'یوزر'
                 };
                 
                 console.log('Game record data:', gameRecord);
@@ -1491,7 +1746,6 @@
                     
                     console.log('✅ Game recorded successfully in Supabase');
                 } else {
-                    // Save to localStorage
                     console.log('Saving to localStorage...');
                     const existingRecords = JSON.parse(localStorage.getItem('rummy_records') || '[]');
                     existingRecords.unshift({...gameRecord, id: 'local_' + Date.now()});
@@ -1499,7 +1753,6 @@
                     console.log('✅ Game recorded successfully in localStorage');
                 }
                 
-                // Mark as recorded and save game state
                 gameState.isRecorded = true;
                 await saveGameState();
                 
@@ -1523,11 +1776,9 @@
             }
 
             try {
-                // Show loading state
                 recordElement.style.opacity = '0.5';
                 
                 if (isOnline && !recordId.startsWith('local_')) {
-                    // Delete from Supabase
                     const { error } = await supabase
                         .from('rummy_records')
                         .delete()
@@ -1537,7 +1788,6 @@
                     
                     console.log('✅ Record deleted from Supabase');
                 } else {
-                    // Delete from localStorage
                     const existingRecords = JSON.parse(localStorage.getItem('rummy_records') || '[]');
                     const updatedRecords = existingRecords.filter(record => 
                         record.id !== recordId && 
@@ -1547,10 +1797,8 @@
                     console.log('✅ Record deleted from localStorage');
                 }
                 
-                // Remove from UI
                 recordElement.remove();
                 
-                // Check if any records left
                 const remainingRecords = document.querySelectorAll('.record-item');
                 if (remainingRecords.length === 0) {
                     ui.recordsList.innerHTML = '<p class="text-center text-slate-500 urdu-font-normal">ابھی تک کوئی ریکارڈ شدہ گیم نہیں ہے۔</p>';
@@ -1561,7 +1809,6 @@
             } catch (error) {
                 console.error('Error deleting record:', error);
                 setStatus('ریکارڈ حذف کرنے میں ناکامی', true);
-                // Reset opacity
                 recordElement.style.opacity = '1';
             }
         };
@@ -1584,11 +1831,9 @@
                     if (!error) records = onlineRecords || [];
                 }
                 
-                // Also get local records
                 const localRecords = JSON.parse(localStorage.getItem('rummy_records') || '[]');
                 records = [...records, ...localRecords];
                 
-                // Sort by timestamp
                 records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
                 
                 renderRecordsList(records.slice(0, 50));
@@ -1606,15 +1851,14 @@
             renderHistory();
             updateGameStatus();
             updateChart();
+            updateUIForUserRole(); // Update UI based on user role
         };
 
         const renderScoreboard = () => {
             ui.scoreboardLoading.classList.add('hidden');
             
-            // Dynamic grid class calculation
             const playerCount = gameState.players.length;
             let gridClass;
-            // Use flex grid for mobile/small screens, and adjust grid columns for medium/large
             if (playerCount === 2) {
                 gridClass = 'grid-cols-2';
             } else if (playerCount === 3) {
@@ -1624,10 +1868,9 @@
             } else if (playerCount === 6) {
                 gridClass = 'grid-cols-2 md:grid-cols-6';
             } else {
-                gridClass = 'grid-cols-2 md:grid-cols-4'; // Default for 4
+                gridClass = 'grid-cols-2 md:grid-cols-4';
             }
             
-            // Apply the dynamic grid class
             ui.scoreboard.className = `grid gap-4 ${gridClass}`;
 
             ui.scoreboard.innerHTML = gameState.players.map(player => `
@@ -1660,6 +1903,7 @@
                 roundType === 'lucky' ? 'bg-yellow-100 text-yellow-800 lucky-badge' : 'bg-blue-100 text-blue-800 normal-badge'
             }`;
             
+            // Both user and admin can input scores
             ui.playerInputs.innerHTML = gameState.players.map((player, index) => `
                 <div class="flex items-center gap-3">
                     <label class="w-24 text-sm urdu-font-normal text-slate-600">${player.name}</label>
@@ -1667,18 +1911,16 @@
                            class="score-input flex-1 p-3 border border-slate-300 rounded-lg urdu-font-bold text-lg" 
                            placeholder="0" 
                            min="0"
-                           value=""
-                           ${gameState.isGameOver ? 'disabled' : ''}>
+                           value="">
                 </div>
             `).join('');
             
-            // Add event listeners to new inputs
             const newInputs = ui.playerInputs.querySelectorAll('.score-input');
             newInputs.forEach(input => {
                 input.addEventListener('input', () => validateScoreInputs());
             });
             
-            validateScoreInputs(); // Initial validation
+            validateScoreInputs();
         };
 
         const renderHistory = () => {
@@ -1691,7 +1933,7 @@
             ui.noHistoryMsg.classList.add('hidden');
             
             const playerCount = gameState.players.length;
-            const historyGridClass = getPlayerGridClass(playerCount); // Use the utility function
+            const historyGridClass = getPlayerGridClass(playerCount);
 
             ui.historyList.innerHTML = gameState.history.map((round, index) => {
                 const roundNumber = gameState.history.length - index;
@@ -1699,6 +1941,7 @@
                 
                 return `
                     <div class="history-item p-4 hover:bg-slate-50 transition-colors relative">
+                        <!-- FIX: Delete button now visible for both user and admin -->
                         <button class="delete-btn p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" 
                                 data-round-index="${index}">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -1732,6 +1975,7 @@
                 `;
             }).join('');
             
+            // FIX: Delete buttons now work for both user and admin
             document.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const roundIndex = parseInt(e.currentTarget.dataset.roundIndex);
@@ -1741,15 +1985,13 @@
         };
 
         const deleteRound = async (roundIndex) => {
-            // Use a custom modal for confirmation as alert() is forbidden.
-            if (!confirm('کیا آپ واقعی یہ راؤنڈ حذف کرنا چاہتے ہیں؟')) {
+            if (!confirm('کیا آپ واقعی یہ راؤنڈ حذف کرنا چاہتے ہیں؟ اس راؤنڈ کے سکور تمام کھلاڑیوں کے کل سکور سے منہا کر دیے جائیں گے۔')) {
                 return;
             }
             
             try {
                 const removedRound = gameState.history[roundIndex];
                 
-                // Recalculate scores by removing the round's scores
                 removedRound.actualScores.forEach((score, index) => {
                     if(gameState.players[index]) {
                         gameState.players[index].score -= score;
@@ -1758,7 +2000,6 @@
                 
                 gameState.history.splice(roundIndex, 1);
                 
-                // Re-check game over status
                 gameState.isGameOver = false;
                 gameState.isRecorded = false;
                 checkGameOver();
@@ -1776,10 +2017,8 @@
         const renderSettingsModal = () => {
             ui.gameLimitInput.value = gameState.gameLimit;
             
-            // Update the state of Add/Remove buttons
             updatePlayerCountButtons();
             
-            // Render dynamic player name inputs
             ui.playerNameInputs.innerHTML = gameState.players.map((player, index) => `
                 <div>
                     <label for="player-name-${index}" class="block text-sm urdu-font-normal text-slate-600 mb-1">کھلاڑی ${index + 1} (ID: ${player.id})</label>
@@ -1790,7 +2029,6 @@
                 </div>
             `).join('');
 
-            // Render new player name inputs for independent game
             ui.newPlayerNameInputs.innerHTML = gameState.players.map((player, index) => `
                 <input type="text" 
                        class="new-player-input w-full p-2 border border-slate-300 rounded-lg mb-2 text-center urdu-font-normal" 
@@ -1807,13 +2045,12 @@
                 return;
             }
             
-            // Create a new array of player data from the inputs
             const updatedPlayers = gameState.players.map((player, index) => {
                 const input = document.getElementById(`player-name-${index}`);
                 return {
                     id: player.id,
                     name: input.value.trim() || `کھلاڑی ${index + 1}`,
-                    score: player.score // Preserve current score
+                    score: player.score
                 };
             });
             
@@ -1823,8 +2060,7 @@
             const saved = await saveGameState();
             if (saved) {
                 ui.settingsModal.classList.add('hidden');
-                // Re-render everything as player count or names might have changed
-                renderGameUI(); 
+                renderGameUI();
                 setStatus('ترتیبات محفوظ ہو گئیں!');
             }
         };
@@ -1842,8 +2078,12 @@
                 ui.gameOverMessage.querySelector('p').textContent = 
                     `🎯 گیم ختم! ${actualLoser.name} ہار گئے۔ فائنل سکور: ${formatScore(actualLoser.score)}`;
                 
+                // FIX: Show reset button for both user and admin
                 ui.resetGameBtn.classList.remove('hidden');
+                
+                // FIX: Show record button for both user and admin (not just admin)
                 ui.recordGameBtn.classList.remove('hidden');
+                
                 ui.recordGameBtn.disabled = gameState.isRecorded;
                 
                 if (gameState.isRecorded) {
@@ -1867,7 +2107,6 @@
                 return;
             }
             
-            // Chart labels are reversed to show round 1 first
             const labels = gameState.history.map((_, index) => `راؤنڈ ${gameState.history.length - index}`).reverse();
             const datasets = gameState.players.map((player, playerIndex) => {
                 const color = getPlayerColor(playerIndex);
@@ -1875,8 +2114,7 @@
                 let total = 0;
                 
                 [...gameState.history].reverse().forEach(round => {
-                    // Check if score exists for this player index (handles case where player count was reduced)
-                    const score = round.actualScores[playerIndex] || 0; 
+                    const score = round.actualScores[playerIndex] || 0;
                     total += score;
                     cumulativeScores.push(total);
                 });
@@ -1970,23 +2208,26 @@
                 return;
             }
             
+            const isAdmin = currentUser === 'admin';
+            
             ui.recordsList.innerHTML = records.map(record => {
                 const timestamp = record.timestamp?.toDate?.() || new Date(record.timestamp) || new Date();
                 const players = record.players || [];
                 if (players.length === 0) return '';
                 
-                // Calculate winner dynamically
                 const winner = players.reduce((min, player) => 
                     player.score < min.score ? player : min, players[0]
                 );
                 
-                const recordGridClass = getPlayerGridClass(players.length); // Use the utility function
+                const recordGridClass = getPlayerGridClass(players.length);
                 
                 return `
                     <div class="record-item p-4 border border-slate-200 rounded-lg mb-3 hover:bg-slate-50 transition-colors cursor-pointer" data-record-id="${record.id || 'local'}">
+                        ${isAdmin ? `
                         <button class="delete-record-btn urdu-font-normal" data-record-id="${record.id || 'local'}">
                             🗑️ حذف کریں
                         </button>
+                        ` : ''}
                         
                         <div class="flex justify-between items-start mb-2">
                             <div>
@@ -2015,15 +2256,12 @@
                 `;
             }).join('');
             
-            // Add event listeners for record items and delete buttons
             document.querySelectorAll('.record-item').forEach(item => {
                 item.addEventListener('click', (e) => {
-                    // Don't trigger if delete button was clicked
                     if (e.target.classList.contains('delete-record-btn') || e.target.closest('.delete-record-btn')) {
                         return;
                     }
                     const recordId = e.currentTarget.dataset.recordId;
-                    // Find record in the combined array
                     const record = records.find(r => (r.id === recordId) || (r.id === 'local_' + recordId.split('_')[1] && recordId.startsWith('local_')));
                     if (record) {
                         showRecordDetails(record);
@@ -2031,15 +2269,16 @@
                 });
             });
             
-            // Add event listeners for delete buttons
-            document.querySelectorAll('.delete-record-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Prevent triggering the record item click
-                    const recordId = e.currentTarget.dataset.recordId;
-                    const recordElement = e.currentTarget.closest('.record-item');
-                    deleteRecord(recordId, recordElement);
+            if (isAdmin) {
+                document.querySelectorAll('.delete-record-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const recordId = e.currentTarget.dataset.recordId;
+                        const recordElement = e.currentTarget.closest('.record-item');
+                        deleteRecord(recordId, recordElement);
+                    });
                 });
-            });
+            }
         };
 
         const showRecordDetails = (record) => {
@@ -2110,7 +2349,7 @@
         };
 
         // ==================== INITIALIZE APP ====================
-        const init = async () => {
+        const initializeApp = async () => {
             initializeEventListeners();
             initializeStatsModal();
             initializeGameLockSystem();
@@ -2121,7 +2360,6 @@
                 const authSuccess = await initializeAuth();
                 
                 if (authSuccess) {
-                    // Check for active sessions before loading game state
                     const hasActiveSession = await checkSessionOnStartup();
                     
                     if (!hasActiveSession) {
@@ -2137,11 +2375,9 @@
                         renderGameUI();
                         fetchAndRenderRecords();
                         
-                        // Start session updates if we're the active session
-                        setInterval(updateGameSession, 30000); // Update every 30 seconds
+                        setInterval(updateGameSession, 30000);
                     }
                 } else {
-                    // Local mode
                     const hasActiveSession = await checkSessionOnStartup();
                     
                     if (!hasActiveSession) {
@@ -2150,7 +2386,6 @@
                         fetchAndRenderRecords();
                         setStatus('مقامی موڈ میں کام جاری ہے', false);
                         
-                        // Start session updates
                         setInterval(updateGameSession, 30000);
                     }
                 }
@@ -2166,8 +2401,8 @@
             }
         };
 
-        // Start the application
-        init();
+        // Start the application with login system
+        initializeLoginSystem();
     </script>
 </body>
 </html>
