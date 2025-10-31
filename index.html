@@ -217,6 +217,23 @@
             background: #10b981;
             color: white;
         }
+        
+        /* Moazam Awan Name Styles */
+        .moazam-name {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+            font-size: 1.8rem;
+            margin: 10px 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .welcome-message {
+            font-size: 1.2rem;
+            color: #4b5563;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body class="text-slate-800">
@@ -224,7 +241,9 @@
     <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
         <div class="login-modal">
             <div class="text-4xl mb-4">🔐</div>
-            <h2 class="text-2xl urdu-font-bold mb-6 text-slate-800">رمی ڈیش بورڈ میں خوش آمدید</h2>
+            <h2 class="text-2xl urdu-font-bold mb-2 text-slate-800">رمی ڈیش بورڈ میں خوش آمدید</h2>
+            <div class="moazam-name urdu-font-bold">Moazam Awan</div>
+            <p class="welcome-message urdu-font-normal">اپنا پاسورڈ درج کریں</p>
             
             <div class="login-tabs">
                 <button id="user-tab" class="login-tab active urdu-font-bold">یوزر لوگ ان</button>
@@ -276,7 +295,10 @@
         <header class="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
             <div>
                 <div class="flex items-center gap-3">
-                    <h1 class="text-3xl md:text-4xl urdu-font-bold text-slate-900">رمی ڈیش بورڈ 🌐</h1>
+                    <div>
+                        <h1 class="text-3xl md:text-4xl urdu-font-bold text-slate-900">رمی ڈیش بورڈ 🌐</h1>
+                        <div class="moazam-name urdu-font-bold text-xl">Moazam Awan</div>
+                    </div>
                     <span id="user-role-badge" class="user-badge urdu-font-normal"></span>
                     <button id="logout-btn" class="text-sm urdu-font-normal text-slate-500 hover:text-slate-700 transition-colors">
                         (لوگ آؤٹ)
