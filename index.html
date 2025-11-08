@@ -234,6 +234,57 @@
             color: #4b5563;
             margin-bottom: 20px;
         }
+
+        /* Settings Modal Scroll Fix */
+        #settings-modal .bg-white {
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        #player-name-inputs {
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        #new-player-name-inputs {
+            max-height: 200px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        /* Custom scrollbar for settings */
+        #player-name-inputs::-webkit-scrollbar,
+        #new-player-name-inputs::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #player-name-inputs::-webkit-scrollbar-track,
+        #new-player-name-inputs::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        #player-name-inputs::-webkit-scrollbar-thumb,
+        #new-player-name-inputs::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 10px;
+        }
+
+        #player-name-inputs::-webkit-scrollbar-thumb:hover,
+        #new-player-name-inputs::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        /* Ensure save button is always visible */
+        #settings-modal .bg-white > .mt-8 {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding-top: 16px;
+            border-top: 1px solid #e2e8f0;
+            margin-top: 16px;
+        }
     </style>
 </head>
 <body class="text-slate-800">
@@ -410,60 +461,68 @@
         </main>
     </div>
 
-    <!-- Settings Modal (Updated for dynamic player management) -->
+    <!-- Settings Modal (Updated for dynamic player management with scroll fix) -->
     <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-md">
-            <h2 class="text-2xl urdu-font-bold mb-6 text-center">گیم ترتیبات</h2>
-            <div class="space-y-4">
-                <div>
-                    <label for="game-limit-input" class="block text-sm urdu-font-normal text-slate-600 mb-1">گیم کی حد (لوزر سکور)</label>
-                    <input type="number" id="game-limit-input" min="100" class="w-full p-2 border border-slate-300 rounded-lg text-center" value="800">
-                </div>
-
-                <!-- DYNAMIC PLAYER MANAGEMENT SECTION -->
-                <div id="player-name-inputs-container">
-                    <div class="flex justify-between items-center mb-2">
-                        <label class="block text-sm urdu-font-normal text-slate-600">کھلاڑیوں کے نام</label>
-                        <div class="flex gap-2">
-                            <!-- Remove Player Button -->
-                            <button id="remove-player-btn" class="text-red-600 hover:bg-red-50 p-1 rounded-full disabled:opacity-50 transition-colors" title="کھلاڑی ہٹائیں">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path></svg>
-                            </button>
-                            <!-- Add Player Button -->
-                            <button id="add-player-btn" class="text-cyan-600 hover:bg-cyan-50 p-1 rounded-full disabled:opacity-50 transition-colors" title="کھلاڑی شامل کریں">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
-                            </button>
-                        </div>
+        <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="flex-shrink-0">
+                <h2 class="text-2xl urdu-font-bold mb-6 text-center">گیم ترتیبات</h2>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto pr-2 -mr-2">
+                <div class="space-y-4">
+                    <div>
+                        <label for="game-limit-input" class="block text-sm urdu-font-normal text-slate-600 mb-1">گیم کی حد (لوزر سکور)</label>
+                        <input type="number" id="game-limit-input" min="100" class="w-full p-2 border border-slate-300 rounded-lg text-center" value="800">
                     </div>
-                    <div id="player-name-inputs" class="space-y-3">
-                        <!-- Dynamic player name inputs will be rendered here -->
-                    </div>
-                </div>
 
-                <!-- NEW GAME OPTIONS SECTION -->
-                <div class="mt-6 pt-6 border-t border-slate-200">
-                    <h3 class="text-lg urdu-font-bold mb-4 text-slate-800">نئی گیم کے اختیارات</h3>
-                    
-                    <div class="space-y-3 mb-4">
-                        <div id="custom-player-names">
-                            <label class="block text-sm urdu-font-normal text-slate-600 mb-2">کھلاڑیوں کے نئے نام</label>
-                            <div id="new-player-name-inputs">
-                                <!-- Dynamic new player name inputs will be rendered here -->
+                    <!-- DYNAMIC PLAYER MANAGEMENT SECTION -->
+                    <div id="player-name-inputs-container">
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="block text-sm urdu-font-normal text-slate-600">کھلاڑیوں کے نام</label>
+                            <div class="flex gap-2">
+                                <!-- Remove Player Button -->
+                                <button id="remove-player-btn" class="text-red-600 hover:bg-red-50 p-1 rounded-full disabled:opacity-50 transition-colors" title="کھلاڑی ہٹائیں">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path></svg>
+                                </button>
+                                <!-- Add Player Button -->
+                                <button id="add-player-btn" class="text-cyan-600 hover:bg-cyan-50 p-1 rounded-full disabled:opacity-50 transition-colors" title="کھلاڑی شامل کریں">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+                                </button>
                             </div>
                         </div>
+                        <div id="player-name-inputs" class="space-y-3">
+                            <!-- Dynamic player name inputs will be rendered here -->
+                        </div>
                     </div>
-                    
-                    <button id="create-new-game-btn" class="w-full bg-green-600 text-white urdu-font-bold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors duration-200">
-                        🆕 علیحدہ نئی گیم شروع کریں
-                    </button>
-                    <p class="text-xs text-slate-500 urdu-font-normal mt-2 text-center">
-                        یہ گیم موجودہ گیم سے علیحدہ ڈیٹا بیس میں محفوظ ہوگی
-                    </p>
+
+                    <!-- NEW GAME OPTIONS SECTION -->
+                    <div class="mt-6 pt-6 border-t border-slate-200">
+                        <h3 class="text-lg urdu-font-bold mb-4 text-slate-800">نئی گیم کے اختیارات</h3>
+                        
+                        <div class="space-y-3 mb-4">
+                            <div id="custom-player-names">
+                                <label class="block text-sm urdu-font-normal text-slate-600 mb-2">کھلاڑیوں کے نئے نام</label>
+                                <div id="new-player-name-inputs">
+                                    <!-- Dynamic new player name inputs will be rendered here -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button id="create-new-game-btn" class="w-full bg-green-600 text-white urdu-font-bold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors duration-200">
+                            🆕 علیحدہ نئی گیم شروع کریں
+                        </button>
+                        <p class="text-xs text-slate-500 urdu-font-normal mt-2 text-center">
+                            یہ گیم موجودہ گیم سے علیحدہ ڈیٹا بیس میں محفوظ ہوگی
+                        </p>
+                    </div>
                 </div>
             </div>
-            <div class="mt-8 flex justify-end gap-4">
-                <button id="cancel-settings-btn" class="px-4 py-2 bg-slate-200 text-slate-800 urdu-font-normal rounded-lg hover:bg-slate-300 transition-colors">منسوخ</button>
-                <button id="save-settings-btn" class="px-4 py-2 bg-cyan-600 text-white urdu-font-bold rounded-lg hover:bg-cyan-700 transition-colors">کلاؤڈ میں محفوظ کریں</button>
+            
+            <div class="flex-shrink-0 mt-6 pt-4 border-t border-slate-200">
+                <div class="flex justify-end gap-4">
+                    <button id="cancel-settings-btn" class="px-4 py-2 bg-slate-200 text-slate-800 urdu-font-normal rounded-lg hover:bg-slate-300 transition-colors">منسوخ</button>
+                    <button id="save-settings-btn" class="px-4 py-2 bg-cyan-600 text-white urdu-font-bold rounded-lg hover:bg-cyan-700 transition-colors">کلاؤڈ میں محفوظ کریں</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1533,6 +1592,7 @@
                     score: 0
                 });
                 renderSettingsModal();
+                adjustModalHeight(); // یہ لائن شامل کریں
                 setStatus('ایک نیا کھلاڑی شامل کر دیا گیا۔ محفوظ کرنے کے بعد گیم شروع کریں۔');
             } else {
                 setStatus('زیادہ سے زیادہ 6 کھلاڑیوں کو شامل کیا جا سکتا ہے۔', true);
@@ -1553,9 +1613,24 @@
                 }));
                 
                 renderSettingsModal();
+                adjustModalHeight(); // یہ لائن شامل کریں
                 setStatus(`${removedPlayer.name} کو فہرست سے ہٹا دیا گیا۔`);
             } else {
                 setStatus('گیم میں کم از کم 2 کھلاڑی ہونے چاہئیں!', true);
+            }
+        };
+
+        // نیا helper فنکشن شامل کریں
+        const adjustModalHeight = () => {
+            const playerCount = gameState.players.length;
+            const modalContent = document.querySelector('#settings-modal .bg-white');
+            
+            if (playerCount > 4) {
+                modalContent.style.maxHeight = '90vh';
+                modalContent.style.overflowY = 'auto';
+            } else {
+                modalContent.style.maxHeight = 'auto';
+                modalContent.style.overflowY = 'visible';
             }
         };
 
@@ -2042,7 +2117,7 @@
             updatePlayerCountButtons();
             
             ui.playerNameInputs.innerHTML = gameState.players.map((player, index) => `
-                <div>
+                <div class="mb-3">
                     <label for="player-name-${index}" class="block text-sm urdu-font-normal text-slate-600 mb-1">کھلاڑی ${index + 1} (ID: ${player.id})</label>
                     <input type="text" 
                            id="player-name-${index}" 
@@ -2057,6 +2132,9 @@
                        value="${player.name}" 
                        placeholder="کھلاڑی ${index + 1}">
             `).join('');
+
+            // Adjust modal height based on player count
+            adjustModalHeight();
         };
 
         const handleSaveSettings = async () => {
