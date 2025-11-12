@@ -285,6 +285,22 @@
             border-top: 1px solid #e2e8f0;
             margin-top: 16px;
         }
+
+        /* Notification Styles */
+        .notification-badge {
+            animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+        @keyframes ping {
+            75%, 100% { transform: scale(1.5); opacity: 0; }
+        }
+
+        /* Toast animation */
+        .toast-slide-in {
+            transform: translateX(0);
+        }
+        #notification-toast {
+            transition: transform 0.3s ease-in-out;
+        }
     </style>
 </head>
 <body class="text-slate-800">
@@ -330,6 +346,39 @@
                     یوزر: سکور درج کر سکتا ہے • ایڈمن: مکمل کنٹرول
                 </p>
             </div>
+        </div>
+    </div>
+
+    <!-- Notification Modal -->
+    <div id="notification-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-md">
+            <div class="text-center">
+                <div class="text-3xl mb-4">🎮</div>
+                <h2 class="text-xl urdu-font-bold mb-2">نئی گیم شروع ہوئی!</h2>
+                <p id="notification-message" class="urdu-font-normal text-slate-600 mb-4">
+                    <!-- Notification message will appear here -->
+                </p>
+                <div class="flex gap-3 justify-center">
+                    <button id="view-game-btn" class="px-4 py-2 bg-cyan-600 text-white urdu-font-normal rounded-lg hover:bg-cyan-700 transition-colors">
+                        گیم دیکھیں
+                    </button>
+                    <button id="ignore-notification-btn" class="px-4 py-2 bg-slate-200 text-slate-800 urdu-font-normal rounded-lg hover:bg-slate-300 transition-colors">
+                        نظر انداز کریں
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast (for less intrusive notifications) -->
+    <div id="notification-toast" class="fixed top-4 right-4 bg-cyan-600 text-white p-4 rounded-lg shadow-lg z-50 hidden transition-transform duration-300 translate-x-full">
+        <div class="flex items-center gap-3">
+            <div class="text-xl">🎮</div>
+            <div>
+                <p id="toast-message" class="urdu-font-bold text-sm"></p>
+                <button id="toast-view-btn" class="text-xs underline urdu-font-normal mt-1">گیم دیکھیں</button>
+            </div>
+            <button id="toast-close-btn" class="text-white hover:text-cyan-200">✕</button>
         </div>
     </div>
 
@@ -648,6 +697,11 @@
         let isViewOnlyMode = false;
         let gameLockModal, viewGameBtn, newGameBtn, currentGameInfo;
 
+        // ==================== NOTIFICATION SYSTEM ====================
+        let notificationModal, notificationMessage, viewNotificationBtn, ignoreNotificationBtn;
+        let notificationToast, toastMessage, toastViewBtn, toastCloseBtn;
+        let currentNotificationSession = null;
+
         // ==================== UI ELEMENTS ====================
         const ui = {
             // Login UI
@@ -686,9 +740,9 @@
             historyList: document.getElementById('history-list'),
             noHistoryMsg: document.getElementById('no-history-msg'),
             settingsBtn: document.getElementById('settings-btn'),
-            passwordBtn: document.getElementById('password-btn'), // نیا پاسورڈ بٹن
+            passwordBtn: document.getElementById('password-btn'),
             settingsModal: document.getElementById('settings-modal'),
-            passwordModal: document.getElementById('password-modal'), // نیا پاسورڈ مودل
+            passwordModal: document.getElementById('password-modal'),
             gameLimitInput: document.getElementById('game-limit-input'),
             playerNameInputs: document.getElementById('player-name-inputs'),
             cancelSettingsBtn: document.getElementById('cancel-settings-btn'),
@@ -874,6 +928,231 @@
             ui.passwordModal.classList.add('hidden');
         };
 
+        // ==================== NOTIFICATION SYSTEM FUNCTIONS ====================
+        const initializeNotificationSystem = () => {
+            // Initialize notification UI elements
+            notificationModal = document.getElementById('notification-modal');
+            notificationMessage = document.getElementById('notification-message');
+            viewNotificationBtn = document.getElementById('view-game-btn');
+            ignoreNotificationBtn = document.getElementById('ignore-notification-btn');
+            
+            notificationToast = document.getElementById('notification-toast');
+            toastMessage = document.getElementById('toast-message');
+            toastViewBtn = document.getElementById('toast-view-btn');
+            toastCloseBtn = document.getElementById('toast-close-btn');
+
+            // Event listeners for notification modal
+            viewNotificationBtn.addEventListener('click', handleViewGameNotification);
+            ignoreNotificationBtn.addEventListener('click', () => {
+                notificationModal.classList.add('hidden');
+            });
+
+            // Event listeners for toast
+            toastViewBtn.addEventListener('click', handleViewGameNotification);
+            toastCloseBtn.addEventListener('click', () => {
+                notificationToast.classList.add('hidden');
+            });
+
+            // Start listening for new game notifications
+            startNotificationListener();
+        };
+
+        const startNotificationListener = () => {
+            if (!isOnline) {
+                console.log('Offline mode: Notification system disabled');
+                return;
+            }
+
+            try {
+                const notificationChannel = supabase
+                    .channel('rummy-game-notifications')
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: 'INSERT',
+                            schema: 'public',
+                            table: 'rummy_sessions',
+                            filter: `is_active=eq.true`
+                        },
+                        async (payload) => {
+                            console.log('New game notification received:', payload);
+                            
+                            // Don't show notification for our own sessions
+                            if (payload.new.user_id === userId) {
+                                return;
+                            }
+
+                            // Check if this is a recent session (last 2 minutes)
+                            const sessionTime = new Date(payload.new.last_updated);
+                            const now = new Date();
+                            const timeDiff = (now - sessionTime) / (1000 * 60); // difference in minutes
+                            
+                            if (timeDiff > 2) {
+                                console.log('Ignoring old session notification');
+                                return;
+                            }
+
+                            await showNewGameNotification(payload.new);
+                        }
+                    )
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: 'UPDATE',
+                            schema: 'public',
+                            table: 'rummy_sessions',
+                            filter: `is_active=eq.true`
+                        },
+                        async (payload) => {
+                            // Show notification for game resets (when is_active becomes true again)
+                            if (payload.new.user_id === userId) {
+                                return;
+                            }
+
+                            const sessionTime = new Date(payload.new.last_updated);
+                            const now = new Date();
+                            const timeDiff = (now - sessionTime) / (1000 * 60);
+                            
+                            if (timeDiff > 2) {
+                                return;
+                            }
+
+                            await showNewGameNotification(payload.new);
+                        }
+                    )
+                    .subscribe((status) => {
+                        console.log('Notification channel status:', status);
+                    });
+
+            } catch (error) {
+                console.error('Error starting notification listener:', error);
+            }
+        };
+
+        const showNewGameNotification = async (session) => {
+            currentNotificationSession = session;
+            
+            const playerNames = session.player_names || ['نامعلوم کھلاڑی'];
+            const gameLimit = session.game_limit || 800;
+            const userName = await getUserName(session.user_id);
+            
+            const message = `${userName} نے نئی گیم شروع کی! کھلاڑی: ${playerNames.join(', ')} - حد: ${gameLimit}`;
+            
+            // Show toast notification (less intrusive)
+            showToastNotification(message);
+            
+            // Also show modal if app is in background or user is inactive
+            setTimeout(() => {
+                if (!document.hidden) {
+                    showModalNotification(message);
+                }
+            }, 3000);
+        };
+
+        const showToastNotification = (message) => {
+            toastMessage.textContent = message;
+            notificationToast.classList.remove('hidden');
+            notificationToast.classList.add('toast-slide-in');
+            
+            // Auto hide after 8 seconds
+            setTimeout(() => {
+                notificationToast.classList.add('hidden');
+                notificationToast.classList.remove('toast-slide-in');
+            }, 8000);
+        };
+
+        const showModalNotification = (message) => {
+            notificationMessage.textContent = message;
+            notificationModal.classList.remove('hidden');
+        };
+
+        const getUserName = async (targetUserId) => {
+            try {
+                // Try to get user info from Supabase
+                const { data: userData, error } = await supabase
+                    .from('rummy_users')
+                    .select('user_name')
+                    .eq('id', targetUserId)
+                    .single();
+                    
+                if (!error && userData) {
+                    return userData.user_name || 'ایک کھلاڑی';
+                }
+            } catch (error) {
+                console.log('Could not fetch user name:', error);
+            }
+            
+            return 'ایک کھلاڑی';
+        };
+
+        const handleViewGameNotification = () => {
+            if (!currentNotificationSession) return;
+            
+            // Hide notifications
+            notificationModal.classList.add('hidden');
+            notificationToast.classList.add('hidden');
+            
+            // Enter view mode for the notified game
+            enterViewModeForSession(currentNotificationSession);
+        };
+
+        const enterViewModeForSession = async (session) => {
+            if (!session) return;
+            
+            try {
+                // Show loading
+                ui.loadingOverlay.classList.remove('hidden');
+                ui.loadingOverlay.classList.remove('opacity-0');
+                ui.loadingText.textContent = 'گیم کی معلومات لوڈ ہو رہی ہے...';
+                
+                // Fetch complete game data
+                let gameData = session.game_data;
+                
+                if (!gameData && session.id) {
+                    // Try to fetch from independent games table
+                    const { data: independentGame, error } = await supabase
+                        .from('rummy_independent_games')
+                        .select('game_data')
+                        .eq('id', session.id)
+                        .single();
+                        
+                    if (!error && independentGame) {
+                        gameData = independentGame.game_data;
+                    }
+                }
+                
+                if (gameData) {
+                    // Save current game state temporarily
+                    if (!window.originalGameState) {
+                        window.originalGameState = { ...gameState };
+                    }
+                    
+                    // Load the notified game's state
+                    gameState = {
+                        ...gameData,
+                        isViewOnly: true
+                    };
+                    
+                    // Render the game UI
+                    renderGameUI();
+                    setupViewOnlyMode(`آپ ${session.player_names ? session.player_names.join(', ') : 'دیگر کھلاڑیوں'} کی گیم دیکھ رہے ہیں`);
+                    
+                    setStatus('آپ دوسری گیم دیکھ رہے ہیں۔ اپنی گیم پر واپس جانے کے لیے اوپر والے بٹن پر کلک کریں۔');
+                } else {
+                    setStatus('گیم کی معلومات لوڈ نہیں ہو سکی', true);
+                }
+                
+            } catch (error) {
+                console.error('Error loading session game:', error);
+                setStatus('گیم لوڈ کرنے میں ناکامی', true);
+            } finally {
+                setTimeout(() => {
+                    ui.loadingOverlay.classList.add('opacity-0');
+                    setTimeout(() => ui.loadingOverlay.classList.add('hidden'), 500);
+                }, 1000);
+            }
+        };
+
         // ==================== UTILITY FUNCTIONS ====================
         const formatScore = (score) => score.toLocaleString('ur-PK');
 
@@ -995,6 +1274,10 @@
                         }]);
 
                     if (error) throw error;
+                    
+                    // Notify other users about new game
+                    await notifyNewGameStart();
+                    
                 } catch (error) {
                     console.error('Error creating session:', error);
                     localStorage.setItem('rummy_active_session', JSON.stringify(currentGameSession));
@@ -1004,7 +1287,7 @@
             }
 
             gameLockModal.classList.add('hidden');
-            setStatus('نئی گیم شروع ہو گئی! یہ گیم علیحدہ ڈیٹا بیس میں محفوظ ہوگی۔');
+            setStatus('نئی گیم شروع ہو گئی! دیگر صارفین کو نوٹیفکیشن بھیج دی گئی۔');
         };
 
         const enterViewOnlyMode = () => {
@@ -1014,15 +1297,20 @@
             setStatus('آپ ویو اونلی موڈ میں ہیں۔ گیم دیکھ سکتے ہیں لیکن تبدیلی نہیں کر سکتے۔');
         };
 
-        const setupViewOnlyMode = () => {
+        const setupViewOnlyMode = (message = 'ویو اونلی موڈ - گیم پہلے سے چل رہی ہے') => {
+            const existingBanner = document.querySelector('.game-lock-banner');
+            if (existingBanner) {
+                existingBanner.remove();
+            }
+
             const banner = document.createElement('div');
             banner.className = 'game-lock-banner';
             banner.innerHTML = `
-                <div class="flex items-center justify-center gap-3">
+                <div class="flex items-center justify-center gap-3 flex-wrap">
                     <span class="text-xl">👁️</span>
-                    <span class="urdu-font-bold">ویو اونلی موڈ - گیم پہلے سے چل رہی ہے</span>
-                    <button id="exit-view-btn" class="bg-white text-red-600 px-3 py-1 rounded-lg text-sm urdu-font-normal hover:bg-red-50 transition-colors">
-                        نئی گیم شروع کریں
+                    <span class="urdu-font-bold">${message}</span>
+                    <button id="exit-view-btn" class="bg-white text-cyan-600 px-3 py-1 rounded-lg text-sm urdu-font-normal hover:bg-cyan-50 transition-colors">
+                        اپنی گیم پر واپس جائیں
                     </button>
                 </div>
             `;
@@ -1030,9 +1318,15 @@
             document.querySelector('main').prepend(banner);
             
             document.getElementById('exit-view-btn').addEventListener('click', () => {
-                if (confirm('کیا آپ واقعی نئی گیم شروع کرنا چاہتے ہیں؟ موجودہ گیم کی نقل آپ کی ڈیوائس پر محفوظ ہوگی۔')) {
-                    location.reload();
+                if (window.originalGameState) {
+                    gameState = window.originalGameState;
+                    window.originalGameState = null;
+                    gameState.isViewOnly = false;
+                    renderGameUI();
                 }
+                banner.remove();
+                enableInteractiveElements();
+                setStatus('آپ اپنی گیم پر واپس آ گئے ہیں۔');
             });
 
             disableInteractiveElements();
@@ -1052,6 +1346,22 @@
 
             ui.saveScoreBtn.textContent = 'ویو اونلی موڈ';
             ui.saveScoreBtn.style.background = '#9ca3af';
+        };
+
+        const enableInteractiveElements = () => {
+            const scoreInputs = document.querySelectorAll('.score-input');
+            scoreInputs.forEach(input => {
+                input.disabled = false;
+                input.placeholder = '0';
+            });
+
+            ui.saveScoreBtn.disabled = false;
+            ui.settingsBtn.disabled = false;
+            ui.resetGameBtn.disabled = false;
+            ui.recordGameBtn.disabled = false;
+
+            ui.saveScoreBtn.textContent = 'سکور کلاؤڈ میں محفوظ کریں';
+            ui.saveScoreBtn.style.background = '';
         };
 
         const updateGameSession = async () => {
@@ -1154,6 +1464,38 @@
             };
 
             return newGameState;
+        };
+
+        // ==================== NOTIFICATION HELPER FUNCTIONS ====================
+        const notifyNewGameStart = async () => {
+            if (!isOnline) return;
+            
+            try {
+                // Create a notification record
+                const notification = {
+                    type: 'new_game',
+                    user_id: userId,
+                    user_name: currentUser === 'admin' ? 'ایڈمن' : 'یوزر',
+                    game_data: {
+                        player_names: gameState.players.map(p => p.name),
+                        game_limit: gameState.gameLimit,
+                        session_id: currentGameSession.id
+                    },
+                    created_at: new Date().toISOString()
+                };
+                
+                // Store notification in database
+                const { error } = await supabase
+                    .from('rummy_notifications')
+                    .insert([notification]);
+                    
+                if (error) {
+                    console.error('Error saving notification:', error);
+                }
+                
+            } catch (error) {
+                console.error('Error notifying new game:', error);
+            }
         };
 
         // ==================== STATISTICS SYSTEM ====================
@@ -2453,6 +2795,7 @@
             initializeEventListeners();
             initializeStatsModal();
             initializeGameLockSystem();
+            initializeNotificationSystem(); // Initialize notification system
             
             try {
                 ui.loadingText.textContent = 'سسٹم شروع ہو رہا ہے...';
