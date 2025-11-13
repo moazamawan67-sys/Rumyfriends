@@ -363,12 +363,6 @@
             </div>
             <div class="flex items-center gap-2">
                 <span id="sync-status" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded urdu-font-normal">🔄 کلاؤڈ سینک</span>
-                <button id="view-active-games-btn" class="p-3 rounded-full hover:bg-slate-200 transition-colors duration-200" aria-label="ایکٹو گیمز دیکھیں">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-600">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                </button>
                 <button id="stats-btn" class="p-3 rounded-full hover:bg-slate-200 transition-colors duration-200" aria-label="شماریات">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-600">
                         <line x1="18" y1="20" x2="18" y2="10"></line>
@@ -584,27 +578,6 @@
         </div>
     </div>
 
-    <!-- Active Games Modal -->
-    <div id="active-games-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-            <div class="flex-shrink-0">
-                <h2 class="text-2xl urdu-font-bold mb-6 text-center">دوسرے ڈیوائسز پر جاری گیمز</h2>
-            </div>
-            
-            <div class="flex-1 overflow-y-auto pr-2 -mr-2">
-                <div id="active-games-list" class="space-y-4">
-                    <p class="text-center text-slate-500 urdu-font-normal py-8">ایکٹو گیمز لوڈ ہو رہی ہیں...</p>
-                </div>
-            </div>
-            
-            <div class="flex-shrink-0 mt-6 pt-4 border-t border-slate-200">
-                <div class="flex justify-end">
-                    <button id="close-active-games-btn" class="px-4 py-2 bg-slate-200 text-slate-800 urdu-font-normal rounded-lg hover:bg-slate-300 transition-colors">بند کریں</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Game Lock Modal -->
     <div id="game-lock-modal" class="view-only-overlay hidden">
         <div class="view-only-modal">
@@ -745,13 +718,7 @@
             statsContent: document.getElementById('stats-content'),
             closeStatsBtn: document.getElementById('close-stats-btn'),
             createNewGameBtn: document.getElementById('create-new-game-btn'),
-            newPlayerNameInputs: document.getElementById('new-player-name-inputs'),
-            
-            // Active Games Viewer UI
-            viewActiveGamesBtn: document.getElementById('view-active-games-btn'),
-            activeGamesModal: document.getElementById('active-games-modal'),
-            activeGamesList: document.getElementById('active-games-list'),
-            closeActiveGamesBtn: document.getElementById('close-active-games-btn')
+            newPlayerNameInputs: document.getElementById('new-player-name-inputs')
         };
 
         let scoreChart;
@@ -949,254 +916,6 @@
             if (playerCount === 5) return 'grid-cols-5';
             if (playerCount === 6) return 'grid-cols-6';
             return 'grid-cols-2 md:grid-cols-4'; 
-        };
-
-        // ==================== ACTIVE GAMES VIEWER SYSTEM ====================
-        const initializeActiveGamesViewer = () => {
-            ui.viewActiveGamesBtn.addEventListener('click', showActiveGames);
-            ui.closeActiveGamesBtn.addEventListener('click', () => {
-                ui.activeGamesModal.classList.add('hidden');
-            });
-        };
-
-        const showActiveGames = async () => {
-            ui.activeGamesModal.classList.remove('hidden');
-            ui.activeGamesList.innerHTML = '<p class="text-center text-slate-500 urdu-font-normal py-8">ایکٹو گیمز لوڈ ہو رہی ہیں...</p>';
-            
-            try {
-                const activeGames = await fetchActiveGames();
-                renderActiveGamesList(activeGames);
-            } catch (error) {
-                console.error('Error fetching active games:', error);
-                ui.activeGamesList.innerHTML = `
-                    <div class="text-center py-8">
-                        <p class="text-red-500 urdu-font-normal">ایکٹو گیمز لوڈ کرنے میں ناکامی</p>
-                        <p class="text-slate-400 urdu-font-normal text-sm mt-2">براہ کرم انٹرنیٹ کنکشن چیک کریں</p>
-                    </div>
-                `;
-            }
-        };
-
-        const fetchActiveGames = async () => {
-            if (!isOnline) {
-                // مقامی طور پر محفوظ شدہ سیشنز چیک کریں
-                const localSession = localStorage.getItem('rummy_active_session');
-                const sessions = [];
-                
-                if (localSession) {
-                    const sessionData = JSON.parse(localSession);
-                    if (sessionData.userId !== userId) {
-                        sessions.push(sessionData);
-                    }
-                }
-                
-                // مقالی طور پر محفوظ شدہ independent گیمز چیک کریں
-                const independentGames = JSON.parse(localStorage.getItem('rummy_independent_games') || '[]');
-                independentGames.forEach(game => {
-                    if (game.user_id !== userId && game.is_active) {
-                        sessions.push({
-                            id: game.id,
-                            userId: game.user_id,
-                            playerNames: game.game_data?.players?.map(p => p.name) || ['نامعلوم'],
-                            gameLimit: game.game_data?.gameLimit || 800,
-                            lastUpdated: game.created_at,
-                            isIndependent: true
-                        });
-                    }
-                });
-                
-                return sessions;
-            }
-
-            try {
-                const sessions = [];
-                
-                // Active sessions fetch کریں
-                const { data: activeSessions, error: sessionsError } = await supabase
-                    .from('rummy_sessions')
-                    .select('*')
-                    .eq('is_active', true)
-                    .order('last_updated', { ascending: false });
-                
-                if (!sessionsError && activeSessions) {
-                    activeSessions.forEach(session => {
-                        if (session.user_id !== userId) {
-                            sessions.push({
-                                id: session.id,
-                                userId: session.user_id,
-                                playerNames: session.player_names || ['نامعلوم'],
-                                gameLimit: session.game_limit || 800,
-                                lastUpdated: session.last_updated,
-                                isIndependent: false
-                            });
-                        }
-                    });
-                }
-                
-                // Independent games fetch کریں
-                const { data: independentGames, error: gamesError } = await supabase
-                    .from('rummy_independent_games')
-                    .select('*')
-                    .eq('is_active', true)
-                    .order('created_at', { ascending: false });
-                
-                if (!gamesError && independentGames) {
-                    independentGames.forEach(game => {
-                        if (game.user_id !== userId) {
-                            sessions.push({
-                                id: game.id,
-                                userId: game.user_id,
-                                playerNames: game.game_data?.players?.map(p => p.name) || ['نامعلوم'],
-                                gameLimit: game.game_data?.gameLimit || 800,
-                                lastUpdated: game.created_at,
-                                isIndependent: true
-                            });
-                        }
-                    });
-                }
-                
-                return sessions;
-            } catch (error) {
-                console.error('Error fetching active games:', error);
-                return [];
-            }
-        };
-
-        const renderActiveGamesList = (activeGames) => {
-            const activeGamesList = document.getElementById('active-games-list');
-            
-            if (activeGames.length === 0) {
-                activeGamesList.innerHTML = `
-                    <div class="text-center py-8">
-                        <div class="text-4xl mb-4">🎮</div>
-                        <p class="text-slate-500 urdu-font-normal">فی الحال کوئی ایکٹو گیم نہیں ہے</p>
-                        <p class="text-slate-400 urdu-font-normal text-sm mt-2">دوسرے ڈیوائسز پر کوئی گیم جاری نہیں ہے</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            activeGamesList.innerHTML = activeGames.map(game => {
-                const lastUpdated = new Date(game.lastUpdated);
-                const timeDiff = Math.floor((new Date() - lastUpdated) / (1000 * 60)); // منٹوں میں فرق
-                const playerNames = game.playerNames.join(', ');
-                
-                return `
-                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 hover:bg-slate-100 transition-colors">
-                        <div class="flex justify-between items-start mb-3">
-                            <div>
-                                <h3 class="urdu-font-bold text-slate-800 text-lg">${playerNames}</h3>
-                                <p class="text-slate-600 urdu-font-normal text-sm">حد: ${formatScore(game.gameLimit)}</p>
-                            </div>
-                            <span class="text-xs px-2 py-1 rounded-full ${
-                                game.isIndependent ? 'bg-purple-100 text-purple-800' : 'bg-cyan-100 text-cyan-800'
-                            } urdu-font-normal">
-                                ${game.isIndependent ? 'علیحدہ گیم' : 'مین گیم'}
-                            </span>
-                        </div>
-                        
-                        <div class="flex justify-between items-center text-sm text-slate-500 mb-3">
-                            <span class="urdu-font-normal">آخری اپ ڈیٹ:</span>
-                            <span class="urdu-font-normal">${timeDiff} منٹ پہلے</span>
-                        </div>
-                        
-                        <button class="view-game-btn w-full bg-cyan-600 text-white urdu-font-bold py-2 px-4 rounded-lg hover:bg-cyan-700 transition-colors duration-200 flex items-center justify-center gap-2"
-                                data-game-id="${game.id}" 
-                                data-game-type="${game.isIndependent ? 'independent' : 'session'}">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                <circle cx="12" cy="12" r="3"></circle>
-                            </svg>
-                            گیم دیکھیں (ویو اونلی)
-                        </button>
-                    </div>
-                `;
-            }).join('');
-            
-            // View game buttons کے لیے event listeners شامل کریں
-            document.querySelectorAll('.view-game-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const gameId = e.currentTarget.dataset.gameId;
-                    const gameType = e.currentTarget.dataset.gameType;
-                    viewGameInReadOnlyMode(gameId, gameType);
-                });
-            });
-        };
-
-        const viewGameInReadOnlyMode = async (gameId, gameType) => {
-            const activeGamesModal = document.getElementById('active-games-modal');
-            activeGamesModal.classList.add('hidden');
-            
-            try {
-                let gameData;
-                
-                if (gameType === 'session') {
-                    if (isOnline) {
-                        const { data, error } = await supabase
-                            .from('rummy_sessions')
-                            .select('*')
-                            .eq('id', gameId)
-                            .single();
-                        
-                        if (error) throw error;
-                        gameData = data.game_data;
-                    } else {
-                        const localSession = localStorage.getItem('rummy_active_session');
-                        if (localSession) {
-                            const sessionData = JSON.parse(localSession);
-                            if (sessionData.id === gameId) {
-                                gameData = sessionData.gameData;
-                            }
-                        }
-                    }
-                } else if (gameType === 'independent') {
-                    if (isOnline) {
-                        const { data, error } = await supabase
-                            .from('rummy_independent_games')
-                            .select('*')
-                            .eq('id', gameId)
-                            .single();
-                        
-                        if (error) throw error;
-                        gameData = data.game_data;
-                    } else {
-                        const independentGames = JSON.parse(localStorage.getItem('rummy_independent_games') || '[]');
-                        const game = independentGames.find(g => g.id === gameId);
-                        if (game) {
-                            gameData = game.game_data;
-                        }
-                    }
-                }
-                
-                if (gameData) {
-                    // View-only mode میں گیم لوڈ کریں
-                    loadGameInViewOnlyMode(gameData);
-                    setStatus(`"${gameData.players.map(p => p.name).join(', ')}" کی گیم ویو اونلی موڈ میں دیکھ رہے ہیں`);
-                } else {
-                    setStatus('گیم ڈیٹا لوڈ کرنے میں ناکامی', true);
-                }
-            } catch (error) {
-                console.error('Error loading game for view:', error);
-                setStatus('گیم دیکھنے میں ناکامی', true);
-            }
-        };
-
-        const loadGameInViewOnlyMode = (gameData) => {
-            // موجودہ گیم اسٹیٹ کو view-only game سے تبدیل کریں
-            gameState = {
-                ...gameData,
-                isViewOnly: true
-            };
-            
-            // View-only mode activate کریں
-            isViewOnlyMode = true;
-            
-            // UI کو view-only mode میں اپڈیٹ کریں
-            setupViewOnlyMode();
-            renderGameUI();
-            
-            // Interactive elements کو disable کریں
-            disableInteractiveElements();
         };
 
         // ==================== MULTI-DEVICE GAME LOCK SYSTEM ====================
@@ -2734,7 +2453,6 @@
             initializeEventListeners();
             initializeStatsModal();
             initializeGameLockSystem();
-            initializeActiveGamesViewer(); // نیا فنکشن شامل کریں
             
             try {
                 ui.loadingText.textContent = 'سسٹم شروع ہو رہا ہے...';
