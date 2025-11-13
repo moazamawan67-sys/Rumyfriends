@@ -634,6 +634,26 @@
     </div>
 
     <script>
+        // ==================== UTILITY FUNCTIONS (RETRY MECHANISM) ====================
+        // Function for exponential backoff and retry for Supabase/network calls
+        const withRetry = async (fn, maxRetries = 3, delay = 1000) => {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const result = await fn();
+                    return result; // Success
+                } catch (error) {
+                    // Log the attempt failure without throwing an error right away
+                    console.warn(`Retry attempt ${i + 1} failed:`, error.message);
+                    if (i === maxRetries - 1) {
+                        // Last attempt failed, throw error
+                        throw error;
+                    }
+                    // Wait for exponential delay
+                    await new Promise(resolve => setTimeout(resolve, delay * (2 ** i)));
+                }
+            }
+        };
+
         // ==================== LOGIN SYSTEM ====================
         const DEFAULT_PASSWORDS = {
             admin: 'admin123',
@@ -960,38 +980,62 @@
         };
 
         const showActiveGames = async () => {
-            ui.activeGamesModal.classList.remove('hidden');
-            ui.activeGamesList.innerHTML = '<p class="text-center text-slate-500 urdu-font-normal py-8">ایکٹو گیمز لوڈ ہو رہی ہیں...</p>';
+            console.log('🔍 View Active Games button clicked');
+            
+            const activeGamesModal = document.getElementById('active-games-modal');
+            const activeGamesList = document.getElementById('active-games-list');
+            
+            activeGamesModal.classList.remove('hidden');
+            activeGamesList.innerHTML = '<p class="text-center text-slate-500 urdu-font-normal py-8">ایکٹو گیمز لوڈ ہو رہی ہیں...</p>';
             
             try {
+                console.log('🔄 Fetching active games...');
                 const activeGames = await fetchActiveGames();
+                console.log(`📋 Active games found: ${activeGames.length}`);
                 renderActiveGamesList(activeGames);
             } catch (error) {
                 console.error('Error fetching active games:', error);
-                ui.activeGamesList.innerHTML = `
+                activeGamesList.innerHTML = `
                     <div class="text-center py-8">
                         <p class="text-red-500 urdu-font-normal">ایکٹو گیمز لوڈ کرنے میں ناکامی</p>
-                        <p class="text-slate-400 urdu-font-normal text-sm mt-2">براہ کرم انٹرنیٹ کنکشن چیک کریں</p>
+                        <p class="text-slate-400 urdu-font-normal text-sm mt-2">براہ مہربانی انٹرنیٹ کنکشن چیک کریں</p>
+                        <p class="text-slate-400 urdu-font-normal text-sm mt-1">Error: ${error.message}</p>
                     </div>
                 `;
             }
         };
 
         const fetchActiveGames = async () => {
+            console.log('🌐 Checking online status: ' + isOnline);
+            
+            const sessions = [];
+
             if (!isOnline) {
-                // مقامی طور پر محفوظ شدہ سیشنز چیک کریں
-                const localSession = localStorage.getItem('rummy_active_session');
-                const sessions = [];
+                console.log('📱 Offline mode - multi-device viewing is limited to local cache checks.');
                 
+                // Although multi-device view is typically online, we check local storage for consistency.
+                const localSession = localStorage.getItem('rummy_active_session');
+                const independentGames = JSON.parse(localStorage.getItem('rummy_independent_games') || '[]');
+                
+                // Check if the current local device has an active session (which would be the current game)
                 if (localSession) {
-                    const sessionData = JSON.parse(localSession);
-                    if (sessionData.userId !== userId) {
-                        sessions.push(sessionData);
+                    try {
+                        const sessionData = JSON.parse(localSession);
+                        const lastUpdate = new Date(sessionData.lastUpdated);
+                        const now = new Date();
+                        const minutesDiff = (now - lastUpdate) / (1000 * 60);
+                        
+                        // Only add if it's considered recent (active) and NOT the current user's *main* game session (which should be handled by the game lock modal)
+                        // In offline mode, listing local sessions is mainly for consistency, but the cross-device feature is moot.
+                        // We will skip listing the current user's local session here to focus on cross-device functionality when online.
+                        console.log('Skipping local session listing in offline mode.');
+
+                    } catch (e) {
+                        console.error('❌ Error parsing local session:', e.message);
                     }
                 }
                 
-                // مقالی طور پر محفوظ شدہ independent گیمز چیک کریں
-                const independentGames = JSON.parse(localStorage.getItem('rummy_independent_games') || '[]');
+                // Only for completeness, though these are typically single-user local games.
                 independentGames.forEach(game => {
                     if (game.user_id !== userId && game.is_active) {
                         sessions.push({
@@ -1005,22 +1049,27 @@
                     }
                 });
                 
+                console.log('📦 Total sessions found offline (only non-user local independent games): ' + sessions.length);
                 return sessions;
             }
 
+            console.log('☁️ Online mode - fetching from Supabase');
+            
             try {
-                const sessions = [];
-                
-                // Active sessions fetch کریں
-                const { data: activeSessions, error: sessionsError } = await supabase
-                    .from('rummy_sessions')
-                    .select('*')
-                    .eq('is_active', true)
-                    .order('last_updated', { ascending: false });
+                // Active sessions fetch کریں (with retry)
+                console.log('🔄 Fetching active sessions from Supabase...');
+                const { data: activeSessions, error: sessionsError } = await withRetry(async () => {
+                    return await supabase
+                        .from('rummy_sessions')
+                        .select('*')
+                        .eq('is_active', true)
+                        .order('last_updated', { ascending: false });
+                });
                 
                 if (!sessionsError && activeSessions) {
+                    console.log('📊 Supabase sessions found:', activeSessions.length);
                     activeSessions.forEach(session => {
-                        if (session.user_id !== userId) {
+                        if (session.user_id !== userId) { // <-- Filter for other users
                             sessions.push({
                                 id: session.id,
                                 userId: session.user_id,
@@ -1029,20 +1078,28 @@
                                 lastUpdated: session.last_updated,
                                 isIndependent: false
                             });
+                        } else {
+                            console.log(`Skipping current user's main session: ${session.id}`);
                         }
                     });
+                } else if (sessionsError) {
+                    console.error('❌ Error fetching sessions:', sessionsError.message);
                 }
                 
-                // Independent games fetch کریں
-                const { data: independentGames, error: gamesError } = await supabase
-                    .from('rummy_independent_games')
-                    .select('*')
-                    .eq('is_active', true)
-                    .order('created_at', { ascending: false });
+                // Independent games fetch کریں (with retry)
+                console.log('🔄 Fetching independent games from Supabase...');
+                const { data: independentGames, error: gamesError } = await withRetry(async () => {
+                    return await supabase
+                        .from('rummy_independent_games')
+                        .select('*')
+                        .eq('is_active', true)
+                        .order('created_at', { ascending: false });
+                });
                 
                 if (!gamesError && independentGames) {
+                    console.log('📊 Supabase independent games found:', independentGames.length);
                     independentGames.forEach(game => {
-                        if (game.user_id !== userId) {
+                        if (game.user_id !== userId) { // <-- Filter for other users
                             sessions.push({
                                 id: game.id,
                                 userId: game.user_id,
@@ -1051,14 +1108,20 @@
                                 lastUpdated: game.created_at,
                                 isIndependent: true
                             });
+                        } else {
+                            console.log(`Skipping current user's independent game: ${game.id}`);
                         }
                     });
+                } else if (gamesError) {
+                    console.error('❌ Error fetching independent games:', gamesError.message);
                 }
                 
+                console.log('📦 Total sessions found online: ' + sessions.length);
                 return sessions;
             } catch (error) {
-                console.error('Error fetching active games:', error);
-                return [];
+                console.error('❌ Error in fetchActiveGames (after retries): ' + error.message);
+                // The `withRetry` call will throw the error on final failure
+                throw error; 
             }
         };
 
@@ -1071,6 +1134,7 @@
                         <div class="text-4xl mb-4">🎮</div>
                         <p class="text-slate-500 urdu-font-normal">فی الحال کوئی ایکٹو گیم نہیں ہے</p>
                         <p class="text-slate-400 urdu-font-normal text-sm mt-2">دوسرے ڈیوائسز پر کوئی گیم جاری نہیں ہے</p>
+                        <p class="text-slate-400 urdu-font-normal text-xs mt-1">User ID: ${userId}</p>
                     </div>
                 `;
                 return;
@@ -1087,6 +1151,7 @@
                             <div>
                                 <h3 class="urdu-font-bold text-slate-800 text-lg">${playerNames}</h3>
                                 <p class="text-slate-600 urdu-font-normal text-sm">حد: ${formatScore(game.gameLimit)}</p>
+                                <p class="text-slate-500 urdu-font-normal text-xs">User: ${game.userId.substring(0, 8)}...</p>
                             </div>
                             <span class="text-xs px-2 py-1 rounded-full ${
                                 game.isIndependent ? 'bg-purple-100 text-purple-800' : 'bg-cyan-100 text-cyan-800'
@@ -1102,7 +1167,8 @@
                         
                         <button class="view-game-btn w-full bg-cyan-600 text-white urdu-font-bold py-2 px-4 rounded-lg hover:bg-cyan-700 transition-colors duration-200 flex items-center justify-center gap-2"
                                 data-game-id="${game.id}" 
-                                data-game-type="${game.isIndependent ? 'independent' : 'session'}">
+                                data-game-type="${game.isIndependent ? 'independent' : 'session'}"
+                                data-user-id="${game.userId}">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                                 <circle cx="12" cy="12" r="3"></circle>
@@ -1118,68 +1184,72 @@
                 btn.addEventListener('click', (e) => {
                     const gameId = e.currentTarget.dataset.gameId;
                     const gameType = e.currentTarget.dataset.gameType;
+                    const gameUserId = e.currentTarget.dataset.userId;
+                    console.log('👁️ Attempting to view game:', gameId, 'Type:', gameType, 'User:', gameUserId);
                     viewGameInReadOnlyMode(gameId, gameType);
                 });
             });
         };
 
         const viewGameInReadOnlyMode = async (gameId, gameType) => {
+            console.log('🔍 Loading game for view:', gameId);
             const activeGamesModal = document.getElementById('active-games-modal');
             activeGamesModal.classList.add('hidden');
             
             try {
-                let gameData;
+                let gameData = null;
                 
                 if (gameType === 'session') {
-                    if (isOnline) {
-                        const { data, error } = await supabase
+                    console.log('🔄 Loading session game from Supabase...');
+                    // Use withRetry for fetching session data
+                    const { data, error } = await withRetry(async () => {
+                        return await supabase
                             .from('rummy_sessions')
-                            .select('*')
+                            .select('game_data')
                             .eq('id', gameId)
                             .single();
-                        
-                        if (error) throw error;
-                        gameData = data.game_data;
-                    } else {
-                        const localSession = localStorage.getItem('rummy_active_session');
-                        if (localSession) {
-                            const sessionData = JSON.parse(localSession);
-                            if (sessionData.id === gameId) {
-                                gameData = sessionData.gameData;
-                            }
-                        }
+                    });
+                    
+                    if (error) {
+                        console.error('❌ Error loading session (after retries):', error.message);
+                        throw error;
                     }
+                    gameData = data.game_data;
+                    console.log('✅ Session game loaded');
+                    
                 } else if (gameType === 'independent') {
-                    if (isOnline) {
-                        const { data, error } = await supabase
+                    console.log('🔄 Loading independent game from Supabase...');
+                    // Use withRetry for fetching independent game data
+                    const { data, error } = await withRetry(async () => {
+                        return await supabase
                             .from('rummy_independent_games')
-                            .select('*')
+                            .select('game_data')
                             .eq('id', gameId)
                             .single();
-                        
-                        if (error) throw error;
-                        gameData = data.game_data;
-                    } else {
-                        const independentGames = JSON.parse(localStorage.getItem('rummy_independent_games') || '[]');
-                        const game = independentGames.find(g => g.id === gameId);
-                        if (game) {
-                            gameData = game.game_data;
-                        }
+                    });
+                    
+                    if (error) {
+                        console.error('❌ Error loading independent game (after retries):', error.message);
+                        throw error;
                     }
+                    gameData = data.game_data;
+                    console.log('✅ Independent game loaded');
                 }
                 
                 if (gameData) {
-                    // View-only mode میں گیم لوڈ کریں
+                    console.log('🎮 Loading game in view-only mode with data:', gameData);
                     loadGameInViewOnlyMode(gameData);
                     setStatus(`"${gameData.players.map(p => p.name).join(', ')}" کی گیم ویو اونلی موڈ میں دیکھ رہے ہیں`);
                 } else {
+                    console.error('❌ No game data found after fetch.');
                     setStatus('گیم ڈیٹا لوڈ کرنے میں ناکامی', true);
                 }
             } catch (error) {
-                console.error('Error loading game for view:', error);
-                setStatus('گیم دیکھنے میں ناکامی', true);
+                console.error('❌ Error loading game for view:', error);
+                setStatus('گیم دیکھنے میں ناکامی: ' + error.message, true);
             }
         };
+
 
         const loadGameInViewOnlyMode = (gameData) => {
             // موجودہ گیم اسٹیٹ کو view-only game سے تبدیل کریں
@@ -1227,12 +1297,14 @@
             }
 
             try {
-                const { data: activeSessions, error } = await supabase
-                    .from('rummy_sessions')
-                    .select('*')
-                    .eq('is_active', true)
-                    .order('last_updated', { ascending: false })
-                    .limit(1);
+                const { data: activeSessions, error } = await withRetry(async () => {
+                    return await supabase
+                        .from('rummy_sessions')
+                        .select('*')
+                        .eq('is_active', true)
+                        .order('last_updated', { ascending: false })
+                        .limit(1);
+                });
 
                 if (error) throw error;
 
@@ -1244,7 +1316,7 @@
                 }
                 return null;
             } catch (error) {
-                console.error('Error checking active sessions:', error);
+                console.error('Error checking active sessions (after retries):', error);
                 return null;
             }
         };
@@ -1263,21 +1335,22 @@
 
             if (isOnline) {
                 try {
-                    const { data, error } = await supabase
-                        .from('rummy_sessions')
-                        .insert([{
-                            id: sessionId,
-                            user_id: userId,
-                            is_active: true,
-                            last_updated: new Date().toISOString(),
-                            game_data: gameState,
-                            player_names: gameState.players.map(p => p.name),
-                            game_limit: gameState.gameLimit
-                        }]);
-
-                    if (error) throw error;
+                    await withRetry(async () => {
+                        const { data, error } = await supabase
+                            .from('rummy_sessions')
+                            .insert([{
+                                id: sessionId,
+                                user_id: userId,
+                                is_active: true,
+                                last_updated: new Date().toISOString(),
+                                game_data: gameState,
+                                player_names: gameState.players.map(p => p.name),
+                                game_limit: gameState.gameLimit
+                            }]);
+                        if (error) throw error;
+                    });
                 } catch (error) {
-                    console.error('Error creating session:', error);
+                    console.error('Error creating session (after retries), falling back to localStorage:', error);
                     localStorage.setItem('rummy_active_session', JSON.stringify(currentGameSession));
                 }
             } else {
@@ -1343,16 +1416,20 @@
 
             if (isOnline) {
                 try {
-                    await supabase
-                        .from('rummy_sessions')
-                        .update({
-                            last_updated: currentGameSession.lastUpdated,
-                            game_data: currentGameSession.gameData,
-                            is_active: !gameState.isGameOver
-                        })
-                        .eq('id', currentGameSession.id);
+                    await withRetry(async () => {
+                        await supabase
+                            .from('rummy_sessions')
+                            .update({
+                                last_updated: currentGameSession.lastUpdated,
+                                game_data: currentGameSession.gameData,
+                                is_active: !gameState.isGameOver
+                            })
+                            .eq('id', currentGameSession.id);
+                    });
                 } catch (error) {
-                    console.error('Error updating session:', error);
+                    console.error('Error updating session (after retries):', error);
+                    // Fallback to localStorage on final failure
+                    localStorage.setItem('rummy_active_session', JSON.stringify(currentGameSession));
                 }
             } else {
                 localStorage.setItem('rummy_active_session', JSON.stringify(currentGameSession));
@@ -1399,19 +1476,29 @@
 
             if (isOnline) {
                 try {
-                    const { data, error } = await supabase
-                        .from('rummy_independent_games')
-                        .insert([{
-                            id: sessionId,
-                            user_id: userId,
-                            game_data: newGameState,
-                            created_at: new Date().toISOString(),
-                            is_active: true
-                        }]);
-
-                    if (error) throw error;
+                    await withRetry(async () => {
+                        const { data, error } = await supabase
+                            .from('rummy_independent_games')
+                            .insert([{
+                                id: sessionId,
+                                user_id: userId,
+                                game_data: newGameState,
+                                created_at: new Date().toISOString(),
+                                is_active: true
+                            }]);
+                        if (error) throw error;
+                    });
                 } catch (error) {
-                    console.error('Error creating independent game:', error);
+                    console.error('Error creating independent game (after retries), falling back to localStorage:', error);
+                    const independentGames = JSON.parse(localStorage.getItem('rummy_independent_games') || '[]');
+                    independentGames.unshift({
+                        id: sessionId,
+                        user_id: userId,
+                        game_data: newGameState,
+                        created_at: new Date().toISOString(),
+                        is_active: true
+                    });
+                    localStorage.setItem('rummy_independent_games', JSON.stringify(independentGames));
                 }
             } else {
                 const independentGames = JSON.parse(localStorage.getItem('rummy_independent_games') || '[]');
@@ -1630,7 +1717,11 @@
             try {
                 ui.loadingText.textContent = 'Supabase کنکشن ٹیسٹ ہو رہا ہے...';
                 
-                const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
+                // Use withRetry for anonymous sign-in
+                const { data: authData, error: authError } = await withRetry(async () => {
+                    return await supabase.auth.signInAnonymously();
+                });
+
                 if (authError) {
                     console.error('Authentication failed:', authError);
                     throw authError;
@@ -1680,26 +1771,25 @@
             }
 
             try {
-                const { data, error } = await supabase
-                    .from('rummy_games')
-                    .upsert({
-                        id: userId,
-                        game_data: stateToSave,
-                        last_updated: new Date().toISOString()
-                    }, {
-                        onConflict: 'id'
-                    });
+                // Use withRetry for upsert
+                await withRetry(async () => {
+                    const { error } = await supabase
+                        .from('rummy_games')
+                        .upsert({
+                            id: userId,
+                            game_data: stateToSave,
+                            last_updated: new Date().toISOString()
+                        }, {
+                            onConflict: 'id'
+                        });
 
-                if (error) {
-                    console.error('❌ Supabase save error:', error);
-                    localStorage.setItem('rummy_current_game', JSON.stringify(stateToSave));
-                    return true;
-                }
+                    if (error) throw error;
+                });
 
                 console.log('✅ Saved to Supabase');
                 return true;
             } catch (error) {
-                console.error('❌ Save failed, using localStorage:', error);
+                console.error('❌ Supabase save failed (after retries), using localStorage:', error);
                 localStorage.setItem('rummy_current_game', JSON.stringify(stateToSave));
                 return true;
             }
@@ -1708,11 +1798,14 @@
         const loadGameState = async () => {
             if (isOnline) {
                 try {
-                    const { data, error } = await supabase
-                        .from('rummy_games')
-                        .select('*')
-                        .eq('id', userId)
-                        .single();
+                    // Use withRetry for select
+                    const { data, error } = await withRetry(async () => {
+                        return await supabase
+                            .from('rummy_games')
+                            .select('*')
+                            .eq('id', userId)
+                            .single();
+                    });
 
                     if (!error && data && data.game_data) {
                         gameState = {
@@ -1729,7 +1822,7 @@
                         return true;
                     }
                 } catch (error) {
-                    console.log('Supabase load failed, trying localStorage...');
+                    console.log('Supabase load failed (after retries), trying localStorage...');
                 }
             }
 
@@ -2113,14 +2206,14 @@
                 
                 if (isOnline) {
                     console.log('Saving to Supabase...');
-                    const { data, error } = await supabase
-                        .from('rummy_records')
-                        .insert([gameRecord]);
-                    
-                    if (error) {
-                        console.error('Supabase insert error:', error);
-                        throw error;
-                    }
+                    // Use withRetry for insert
+                    await withRetry(async () => {
+                        const { data, error } = await supabase
+                            .from('rummy_records')
+                            .insert([gameRecord]);
+                        
+                        if (error) throw error;
+                    });
                     
                     console.log('✅ Game recorded successfully in Supabase');
                 } else {
@@ -2138,7 +2231,7 @@
                 fetchAndRenderRecords(true);
                 
             } catch (error) {
-                console.error('Error recording game:', error);
+                console.error('Error recording game (after retries):', error);
                 setStatus('گیم ریکارڈ کرنے میں ناکامی: ' + error.message, true);
             } finally {
                 ui.recordText.textContent = 'گیم کلاؤڈ میں محفوظ کریں';
@@ -2157,12 +2250,15 @@
                 recordElement.style.opacity = '0.5';
                 
                 if (isOnline && !recordId.startsWith('local_')) {
-                    const { error } = await supabase
-                        .from('rummy_records')
-                        .delete()
-                        .eq('id', recordId);
-                    
-                    if (error) throw error;
+                    // Use withRetry for delete
+                    await withRetry(async () => {
+                        const { error } = await supabase
+                            .from('rummy_records')
+                            .delete()
+                            .eq('id', recordId);
+                        
+                        if (error) throw error;
+                    });
                     
                     console.log('✅ Record deleted from Supabase');
                 } else {
@@ -2185,7 +2281,7 @@
                 setStatus('ریکارڈ شدہ گیم کامیابی سے حذف ہو گئی!');
                 
             } catch (error) {
-                console.error('Error deleting record:', error);
+                console.error('Error deleting record (after retries):', error);
                 setStatus('ریکارڈ حذف کرنے میں ناکامی', true);
                 recordElement.style.opacity = '1';
             }
@@ -2200,11 +2296,14 @@
                 let records = [];
                 
                 if (isOnline) {
-                    const { data: onlineRecords, error } = await supabase
-                        .from('rummy_records')
-                        .select('*')
-                        .order('timestamp', { ascending: false })
-                        .limit(50);
+                    // Use withRetry for select
+                    const { data: onlineRecords, error } = await withRetry(async () => {
+                        return await supabase
+                            .from('rummy_records')
+                            .select('*')
+                            .order('timestamp', { ascending: false })
+                            .limit(50);
+                    });
                     
                     if (!error) records = onlineRecords || [];
                 }
@@ -2217,7 +2316,7 @@
                 renderRecordsList(records.slice(0, 50));
                 
             } catch (error) {
-                console.error('Error fetching records:', error);
+                console.error('Error fetching records (after retries):', error);
                 ui.recordsList.innerHTML = '<p class="text-center text-red-500 urdu-font-normal">ریکارڈز لوڈ ہونے میں ناکامی۔</p>';
             }
         };
@@ -2457,7 +2556,7 @@
                 
                 ui.gameOverMessage.classList.remove('hidden');
                 ui.gameOverMessage.querySelector('p').textContent = 
-                    `🎯 گیم ختم! ${actualLoser.name} ہار گئے۔ فائنل سکور: ${formatScore(actualLoser.score)}`;
+                    `🎯 گیم ختم! ${actualLoser.name} ہار گئے فائنل سکور: ${formatScore(actualLoser.score)}`;
                 
                 // FIX: Show reset button for both user and admin
                 ui.resetGameBtn.classList.remove('hidden');
@@ -2788,3 +2887,5 @@
     </script>
 </body>
 </html>
+
+
